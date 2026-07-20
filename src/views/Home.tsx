@@ -1,47 +1,53 @@
+import { Seats } from '../components'
+import { roomVars } from '../roomColor'
 import { occupancy } from '../store'
 import { useBoard } from '../useBoard'
 
 export function Home() {
   const state = useBoard()
-  const out = state.kids.filter((k) => k.currentRoomId !== null).length
 
   return (
     <main>
-      <h1>Lernraum-Board</h1>
-      <p>
-        {state.kids.length} Kinder, davon {out} in Lernräumen unterwegs.
-      </p>
+      <div className="topbar">
+        <h1>🏫 Lernraum-Board</h1>
+        <a href="#/admin">⚙️ Verwaltung</a>
+      </div>
 
       <h2>Klassen</h2>
-      <ul>
+      <div className="launcher">
         {state.klasses.map((c) => {
           const kids = state.kids.filter((k) => k.klassId === c.id)
           const away = kids.filter((k) => k.currentRoomId !== null).length
           return (
-            <li key={c.id}>
-              <a href={`#/klasse/${c.id}`}>Klasse {c.name}</a> ({kids.length} Kinder, {away} unterwegs)
-            </li>
+            <a key={c.id} href={`#/klasse/${c.id}`}>
+              <div className="tile">
+                <span className="emoji">{kids[0]?.symbol ?? '🚪'}</span>
+                <span className="name">Klasse {c.name}</span>
+                <span className="count">
+                  {away > 0 ? `${away} von ${kids.length} unterwegs` : `${kids.length} Kinder`}
+                </span>
+              </div>
+            </a>
           )
         })}
-      </ul>
+      </div>
 
-      <h2>Räume</h2>
-      <ul>
+      <h2>Lernräume</h2>
+      <div className="launcher">
         {state.rooms.map((r) => (
-          <li key={r.id}>
-            <a href={`#/raum/${r.id}`}>
-              {r.emoji} {r.name}
-            </a>{' '}
-            — {occupancy(r.id, state)} von {r.capacity} belegt
-            {!r.isOpen && ' (geschlossen)'}
-          </li>
+          <a key={r.id} href={`#/raum/${r.id}`}>
+            <div className="tile room-tile" style={roomVars(r)}>
+              <span className="emoji">{r.emoji}</span>
+              <span className="name">{r.name}</span>
+              {r.isOpen ? (
+                <Seats capacity={r.capacity} occupied={occupancy(r.id, state)} />
+              ) : (
+                <span className="reason">heute geschlossen</span>
+              )}
+            </div>
+          </a>
         ))}
-      </ul>
-
-      <h2>Verwaltung</h2>
-      <p>
-        <a href="#/admin">Admin-Bereich</a>
-      </p>
+      </div>
     </main>
   )
 }

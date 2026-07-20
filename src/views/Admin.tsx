@@ -17,13 +17,16 @@ export function Admin() {
   const [klassName, setKlassName] = useState('')
 
   return (
-    <main>
-      <p><a href="#/">← Übersicht</a></p>
-      <h1>Verwaltung</h1>
+    <main className="admin">
+      <div className="topbar">
+        <a href="#/">🏫 Start</a>
+        <h1>⚙️ Verwaltung</h1>
+      </div>
 
       <section>
         <h2>Tagesaktionen</h2>
         <button
+          className="danger"
           onClick={() => {
             if (confirm('Alle Kinder zurück in ihre Klassenzimmer buchen?')) reset()
           }}
@@ -31,6 +34,7 @@ export function Admin() {
           🔄 Alle zurück in die Klasse (Reset)
         </button>{' '}
         <button
+          className="danger"
           onClick={() => {
             if (confirm('Alles verwerfen und die Beispieldaten neu laden?')) reseed()
           }}
@@ -69,6 +73,7 @@ export function Admin() {
                 </td>
                 <td>
                   <button
+                    className="danger"
                     onClick={() => {
                       if (confirm(`Raum „${r.name}" löschen? Eingebuchte Kinder gehen zurück in die Klasse.`))
                         removeRoom(r.id)
@@ -112,6 +117,7 @@ export function Admin() {
             <li key={c.id}>
               Klasse {c.name} ({state.kids.filter((k) => k.klassId === c.id).length} Kinder){' '}
               <button
+                className="danger"
                 onClick={() => {
                   if (confirm(`Klasse ${c.name} samt allen Kindern und klassengebundenen Räumen löschen?`))
                     removeKlass(c.id)
@@ -173,6 +179,7 @@ export function Admin() {
                       ))}
                     </select>{' '}
                     <button
+                      className="danger"
                       onClick={() => {
                         if (confirm(`${k.name} löschen?`)) removeKid(k.id)
                       }}
