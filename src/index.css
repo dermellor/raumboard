@@ -318,16 +318,10 @@ button {
   border-color: var(--ink);
 }
 
-/* --- section headers with add button ------------------------------------------ */
+/* --- add button in table header ------------------------------------------------ */
 
-.section-head {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.section-head h2 {
-  margin-block: 0;
+.admin th.th-add {
+  text-align: right;
 }
 
 .add {
@@ -373,6 +367,11 @@ button {
   padding: 0.5rem 0.75rem;
   border-bottom: 1px solid var(--line);
   text-align: left;
+}
+
+.admin thead th {
+  padding-block: 0.75rem;
+  vertical-align: middle;
 }
 
 .admin input,

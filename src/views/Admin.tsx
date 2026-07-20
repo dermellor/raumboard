@@ -50,16 +50,16 @@ export function Admin() {
       </section>
 
       <section>
-        <div className="section-head">
-          <h2>Räume</h2>
-          <button className="add" aria-label="Raum hinzufügen" onClick={() => setModal('room')}>
-            +
-          </button>
-        </div>
+        <h2>Räume</h2>
         <table>
           <thead>
             <tr>
-              <th>Raum</th><th>Kapazität</th><th>Belegt</th><th>Für</th><th>Status</th><th></th>
+              <th>Raum</th><th>Kapazität</th><th>Belegt</th><th>Für</th><th>Status</th>
+              <th className="th-add">
+                <button className="add" aria-label="Raum hinzufügen" onClick={() => setModal('room')}>
+                  +
+                </button>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -107,16 +107,16 @@ export function Admin() {
       </section>
 
       <section>
-        <div className="section-head">
-          <h2>Klassen</h2>
-          <button className="add" aria-label="Klasse hinzufügen" onClick={() => setModal('klass')}>
-            +
-          </button>
-        </div>
+        <h2>Klassen</h2>
         <table>
           <thead>
             <tr>
-              <th>Klasse</th><th>Kinder</th><th></th>
+              <th>Klasse</th><th>Kinder</th>
+              <th className="th-add">
+                <button className="add" aria-label="Klasse hinzufügen" onClick={() => setModal('klass')}>
+                  +
+                </button>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -149,19 +149,26 @@ export function Admin() {
       </section>
 
       <section>
-        <div className="section-head">
-          <h2>Kinder</h2>
-          <button className="add" aria-label="Kind hinzufügen" onClick={() => setModal('kid')}>
-            +
-          </button>
-        </div>
+        <h2>Kinder</h2>
         {state.klasses.map((c) => (
           <details key={c.id}>
             <summary>Klasse {c.name}</summary>
             <table>
               <thead>
                 <tr>
-                  <th>Kind</th><th>Klasse</th><th></th>
+                  <th>Kind</th><th>Klasse</th>
+                  <th className="th-add">
+                    <button
+                      className="add"
+                      aria-label={`Kind in Klasse ${c.name} hinzufügen`}
+                      onClick={() => {
+                        setKidKlass(c.id)
+                        setModal('kid')
+                      }}
+                    >
+                      +
+                    </button>
+                  </th>
                 </tr>
               </thead>
               <tbody>
