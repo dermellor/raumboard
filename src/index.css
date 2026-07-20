@@ -1,0 +1,6 @@
+/* Deliberately unstyled prototype — only layout + touch targets. */
+main { max-width: 60rem; margin: 0 auto; padding: 1rem; font-family: system-ui, sans-serif; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr)); gap: 0.5rem; }
+.tiles button { min-height: 4.5rem; padding: 0.5rem; }
+.tiles button[aria-pressed='true'] { outline: 3px solid black; }
+section { margin-block: 1.5rem; }
