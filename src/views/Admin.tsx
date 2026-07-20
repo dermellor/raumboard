@@ -4,10 +4,14 @@ import {
   reseed, reset, updateKid, updateKlass, updateRoom,
 } from '../store'
 import { EmojiButton } from '../EmojiButton'
+import { Modal } from '../components'
 import { useBoard } from '../useBoard'
+
+type AdminModal = 'room' | 'klass' | 'kid' | null
 
 export function Admin() {
   const state = useBoard()
+  const [modal, setModal] = useState<AdminModal>(null)
   const [roomName, setRoomName] = useState('')
   const [roomEmoji, setRoomEmoji] = useState('🚪')
   const [roomCapacity, setRoomCapacity] = useState(4)
@@ -46,7 +50,12 @@ export function Admin() {
       </section>
 
       <section>
-        <h2>Räume</h2>
+        <div className="section-head">
+          <h2>Räume</h2>
+          <button className="add" aria-label="Raum hinzufügen" onClick={() => setModal('room')}>
+            +
+          </button>
+        </div>
         <table>
           <thead>
             <tr>
@@ -95,32 +104,15 @@ export function Admin() {
             ))}
           </tbody>
         </table>
-        <h3>Raum hinzufügen</h3>
-        <EmojiButton value={roomEmoji} label="Emoji für neuen Raum" onChange={setRoomEmoji} />
-        <input placeholder="Name" value={roomName} onChange={(e) => setRoomName(e.target.value)} />
-        <input
-          type="number" min={0} value={roomCapacity} style={{ width: '4em' }}
-          onChange={(e) => setRoomCapacity(Math.max(0, Number(e.target.value)))}
-        />
-        <select value={roomScope} onChange={(e) => setRoomScope(e.target.value)}>
-          <option value="all">für alle</option>
-          {state.klasses.map((c) => (
-            <option key={c.id} value={c.id}>nur Klasse {c.name}</option>
-          ))}
-        </select>
-        <button
-          disabled={!roomName.trim()}
-          onClick={() => {
-            addRoom(roomName.trim(), roomEmoji || '🚪', roomCapacity, roomScope)
-            setRoomName('')
-          }}
-        >
-          anlegen
-        </button>
       </section>
 
       <section>
-        <h2>Klassen</h2>
+        <div className="section-head">
+          <h2>Klassen</h2>
+          <button className="add" aria-label="Klasse hinzufügen" onClick={() => setModal('klass')}>
+            +
+          </button>
+        </div>
         <table>
           <thead>
             <tr>
@@ -154,40 +146,15 @@ export function Admin() {
             ))}
           </tbody>
         </table>
-        <EmojiButton value={klassEmoji} label="Emoji für neue Klasse" onChange={setKlassEmoji} />
-        <input placeholder="z.B. 1C" value={klassName} onChange={(e) => setKlassName(e.target.value)} />
-        <button
-          disabled={!klassName.trim()}
-          onClick={() => {
-            addKlass(klassName.trim(), klassEmoji || undefined)
-            setKlassName('')
-          }}
-        >
-          Klasse anlegen
-        </button>
       </section>
 
       <section>
-        <h2>Kinder</h2>
-        <h3>Kind hinzufügen</h3>
-        <EmojiButton value={kidSymbol} label="Symbol für neues Kind" onChange={setKidSymbol} />
-        <input placeholder="Name (z.B. Mina K.)" value={kidName} onChange={(e) => setKidName(e.target.value)} />
-        <select value={kidKlass} onChange={(e) => setKidKlass(e.target.value)}>
-          <option value="">Klasse wählen…</option>
-          {state.klasses.map((c) => (
-            <option key={c.id} value={c.id}>Klasse {c.name}</option>
-          ))}
-        </select>
-        <button
-          disabled={!kidName.trim() || !kidKlass}
-          onClick={() => {
-            addKid(kidKlass, kidSymbol || '⭐', kidName.trim())
-            setKidName('')
-          }}
-        >
-          anlegen
-        </button>
-
+        <div className="section-head">
+          <h2>Kinder</h2>
+          <button className="add" aria-label="Kind hinzufügen" onClick={() => setModal('kid')}>
+            +
+          </button>
+        </div>
         {state.klasses.map((c) => (
           <details key={c.id}>
             <summary>Klasse {c.name}</summary>
@@ -237,6 +204,122 @@ export function Admin() {
           </details>
         ))}
       </section>
+
+      {modal === 'room' && (
+        <Modal title="Raum hinzufügen" onClose={() => setModal(null)}>
+          <div className="field">
+            <label>Symbol</label>
+            <EmojiButton value={roomEmoji} label="Emoji für neuen Raum" onChange={setRoomEmoji} />
+          </div>
+          <div className="field">
+            <label htmlFor="room-name">Name</label>
+            <input
+              id="room-name"
+              placeholder="z.B. Leseecke"
+              value={roomName}
+              autoFocus
+              onChange={(e) => setRoomName(e.target.value)}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="room-capacity">Kapazität</label>
+            <input
+              id="room-capacity"
+              type="number"
+              min={0}
+              value={roomCapacity}
+              style={{ width: '5em' }}
+              onChange={(e) => setRoomCapacity(Math.max(0, Number(e.target.value)))}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="room-scope">Für</label>
+            <select id="room-scope" value={roomScope} onChange={(e) => setRoomScope(e.target.value)}>
+              <option value="all">für alle</option>
+              {state.klasses.map((c) => (
+                <option key={c.id} value={c.id}>nur Klasse {c.name}</option>
+              ))}
+            </select>
+          </div>
+          <button
+            disabled={!roomName.trim()}
+            onClick={() => {
+              addRoom(roomName.trim(), roomEmoji || '🚪', roomCapacity, roomScope)
+              setRoomName('')
+              setModal(null)
+            }}
+          >
+            anlegen
+          </button>
+        </Modal>
+      )}
+
+      {modal === 'klass' && (
+        <Modal title="Klasse hinzufügen" onClose={() => setModal(null)}>
+          <div className="field">
+            <label>Symbol</label>
+            <EmojiButton value={klassEmoji} label="Emoji für neue Klasse" onChange={setKlassEmoji} />
+          </div>
+          <div className="field">
+            <label htmlFor="klass-name">Name</label>
+            <input
+              id="klass-name"
+              placeholder="z.B. 1C"
+              value={klassName}
+              autoFocus
+              onChange={(e) => setKlassName(e.target.value)}
+            />
+          </div>
+          <button
+            disabled={!klassName.trim()}
+            onClick={() => {
+              addKlass(klassName.trim(), klassEmoji || undefined)
+              setKlassName('')
+              setModal(null)
+            }}
+          >
+            anlegen
+          </button>
+        </Modal>
+      )}
+
+      {modal === 'kid' && (
+        <Modal title="Kind hinzufügen" onClose={() => setModal(null)}>
+          <div className="field">
+            <label>Symbol</label>
+            <EmojiButton value={kidSymbol} label="Symbol für neues Kind" onChange={setKidSymbol} />
+          </div>
+          <div className="field">
+            <label htmlFor="kid-name">Name</label>
+            <input
+              id="kid-name"
+              placeholder="z.B. Mina K."
+              value={kidName}
+              autoFocus
+              onChange={(e) => setKidName(e.target.value)}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="kid-klass">Klasse</label>
+            <select id="kid-klass" value={kidKlass} onChange={(e) => setKidKlass(e.target.value)}>
+              <option value="">Klasse wählen…</option>
+              {state.klasses.map((c) => (
+                <option key={c.id} value={c.id}>Klasse {c.name}</option>
+              ))}
+            </select>
+          </div>
+          <button
+            disabled={!kidName.trim() || !kidKlass}
+            onClick={() => {
+              addKid(kidKlass, kidSymbol || '⭐', kidName.trim())
+              setKidName('')
+              setModal(null)
+            }}
+          >
+            anlegen
+          </button>
+        </Modal>
+      )}
     </main>
   )
 }

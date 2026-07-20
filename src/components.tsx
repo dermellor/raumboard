@@ -12,6 +12,28 @@ export function Seats({ capacity, occupied }: { capacity: number; occupied: numb
   )
 }
 
+export function Modal({
+  title,
+  onClose,
+  children,
+}: {
+  title: string
+  onClose: () => void
+  children: ReactNode
+}) {
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="picker modal" onClick={(e) => e.stopPropagation()}>
+        <button className="close" onClick={onClose} aria-label="Schließen">
+          ✕
+        </button>
+        <h2>{title}</h2>
+        {children}
+      </div>
+    </div>
+  )
+}
+
 export function TopBar({ title, children }: { title: string; children?: ReactNode }) {
   return (
     <div className="topbar">
