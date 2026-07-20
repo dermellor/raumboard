@@ -351,18 +351,12 @@ button {
   margin-block: 2rem;
 }
 
-/* list rows (Klassen, Kinder): align controls and give rows breathing room */
-.admin li {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-block: 0.6rem;
+.admin details {
+  margin-block: 0.75rem;
 }
 
-.admin ul {
-  padding-left: 0;
-  list-style: none;
+.admin details table {
+  margin-top: 0.5rem;
 }
 
 /* inline forms (anlegen-rows) and table buttons: consistent gaps */
@@ -384,6 +378,3 @@ button {
   font-weight: 600;
 }
 
-.admin details {
-  margin-block: 0.5rem;
-}

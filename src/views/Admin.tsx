@@ -121,27 +121,39 @@ export function Admin() {
 
       <section>
         <h2>Klassen</h2>
-        <ul>
-          {state.klasses.map((c) => (
-            <li key={c.id}>
-              <EmojiButton
-                value={c.emoji ?? ''}
-                label={`Emoji für Klasse ${c.name}`}
-                onChange={(emoji) => updateKlass(c.id, { emoji })}
-              />{' '}
-              Klasse {c.name} ({state.kids.filter((k) => k.klassId === c.id).length} Kinder){' '}
-              <button
-                className="danger"
-                onClick={() => {
-                  if (confirm(`Klasse ${c.name} samt allen Kindern und klassengebundenen Räumen löschen?`))
-                    removeKlass(c.id)
-                }}
-              >
-                löschen
-              </button>
-            </li>
-          ))}
-        </ul>
+        <table>
+          <thead>
+            <tr>
+              <th>Klasse</th><th>Kinder</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {state.klasses.map((c) => (
+              <tr key={c.id}>
+                <td>
+                  <EmojiButton
+                    value={c.emoji ?? ''}
+                    label={`Emoji für Klasse ${c.name}`}
+                    onChange={(emoji) => updateKlass(c.id, { emoji })}
+                  />{' '}
+                  Klasse {c.name}
+                </td>
+                <td>{state.kids.filter((k) => k.klassId === c.id).length}</td>
+                <td>
+                  <button
+                    className="danger"
+                    onClick={() => {
+                      if (confirm(`Klasse ${c.name} samt allen Kindern und klassengebundenen Räumen löschen?`))
+                        removeKlass(c.id)
+                    }}
+                  >
+                    löschen
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
         <EmojiButton value={klassEmoji} label="Emoji für neue Klasse" onChange={setKlassEmoji} />
         <input placeholder="z.B. 1C" value={klassName} onChange={(e) => setKlassName(e.target.value)} />
         <button
@@ -179,36 +191,49 @@ export function Admin() {
         {state.klasses.map((c) => (
           <details key={c.id}>
             <summary>Klasse {c.name}</summary>
-            <ul>
-              {state.kids
-                .filter((k) => k.klassId === c.id)
-                .map((k) => (
-                  <li key={k.id}>
-                    <EmojiButton
-                      value={k.symbol}
-                      label={`Symbol für ${k.name}`}
-                      onChange={(symbol) => updateKid(k.id, { symbol })}
-                    />{' '}
-                    {k.name}{' '}
-                    <select
-                      value={k.klassId}
-                      onChange={(e) => updateKid(k.id, { klassId: e.target.value })}
-                    >
-                      {state.klasses.map((c2) => (
-                        <option key={c2.id} value={c2.id}>Klasse {c2.name}</option>
-                      ))}
-                    </select>{' '}
-                    <button
-                      className="danger"
-                      onClick={() => {
-                        if (confirm(`${k.name} löschen?`)) removeKid(k.id)
-                      }}
-                    >
-                      löschen
-                    </button>
-                  </li>
-                ))}
-            </ul>
+            <table>
+              <thead>
+                <tr>
+                  <th>Kind</th><th>Klasse</th><th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {state.kids
+                  .filter((k) => k.klassId === c.id)
+                  .map((k) => (
+                    <tr key={k.id}>
+                      <td>
+                        <EmojiButton
+                          value={k.symbol}
+                          label={`Symbol für ${k.name}`}
+                          onChange={(symbol) => updateKid(k.id, { symbol })}
+                        />{' '}
+                        {k.name}
+                      </td>
+                      <td>
+                        <select
+                          value={k.klassId}
+                          onChange={(e) => updateKid(k.id, { klassId: e.target.value })}
+                        >
+                          {state.klasses.map((c2) => (
+                            <option key={c2.id} value={c2.id}>Klasse {c2.name}</option>
+                          ))}
+                        </select>
+                      </td>
+                      <td>
+                        <button
+                          className="danger"
+                          onClick={() => {
+                            if (confirm(`${k.name} löschen?`)) removeKid(k.id)
+                          }}
+                        >
+                          löschen
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
           </details>
         ))}
       </section>
