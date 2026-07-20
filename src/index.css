@@ -278,6 +278,35 @@ button {
   font-weight: 600;
 }
 
+/* --- emoji picker ------------------------------------------------------------ */
+
+.emoji-btn {
+  min-width: 3rem;
+  min-height: 3rem;
+  font-size: 1.5rem;
+  border-radius: 0.8rem;
+  border: 2px solid var(--line);
+  background: var(--card);
+}
+
+.emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(3.2rem, 1fr));
+  gap: 0.25rem;
+}
+
+.emoji-grid button {
+  min-height: 3.2rem;
+  font-size: 1.7rem;
+  border: 2px solid transparent;
+  border-radius: 0.8rem;
+  background: var(--card);
+}
+
+.emoji-grid button[aria-pressed='true'] {
+  border-color: var(--ink);
+}
+
 /* --- admin (functional, calm) ----------------------------------------------- */
 
 .admin table {

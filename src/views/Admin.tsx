@@ -3,6 +3,7 @@ import {
   addKid, addKlass, addRoom, occupancy, removeKid, removeKlass, removeRoom,
   reseed, reset, updateKid, updateKlass, updateRoom,
 } from '../store'
+import { EmojiButton } from '../EmojiButton'
 import { useBoard } from '../useBoard'
 
 export function Admin() {
@@ -56,11 +57,10 @@ export function Admin() {
             {state.rooms.map((r) => (
               <tr key={r.id}>
                 <td>
-                  <input
+                  <EmojiButton
                     value={r.emoji}
-                    style={{ width: '3em' }}
-                    aria-label={`Emoji für ${r.name}`}
-                    onChange={(e) => updateRoom(r.id, { emoji: e.target.value })}
+                    label={`Emoji für ${r.name}`}
+                    onChange={(emoji) => updateRoom(r.id, { emoji })}
                   />{' '}
                   {r.name}
                 </td>
@@ -96,8 +96,8 @@ export function Admin() {
           </tbody>
         </table>
         <h3>Raum hinzufügen</h3>
+        <EmojiButton value={roomEmoji} label="Emoji für neuen Raum" onChange={setRoomEmoji} />
         <input placeholder="Name" value={roomName} onChange={(e) => setRoomName(e.target.value)} />
-        <input value={roomEmoji} style={{ width: '3em' }} onChange={(e) => setRoomEmoji(e.target.value)} />
         <input
           type="number" min={0} value={roomCapacity} style={{ width: '4em' }}
           onChange={(e) => setRoomCapacity(Math.max(0, Number(e.target.value)))}
@@ -124,12 +124,10 @@ export function Admin() {
         <ul>
           {state.klasses.map((c) => (
             <li key={c.id}>
-              <input
+              <EmojiButton
                 value={c.emoji ?? ''}
-                placeholder="⭐"
-                style={{ width: '3em' }}
-                aria-label={`Emoji für Klasse ${c.name}`}
-                onChange={(e) => updateKlass(c.id, { emoji: e.target.value })}
+                label={`Emoji für Klasse ${c.name}`}
+                onChange={(emoji) => updateKlass(c.id, { emoji })}
               />{' '}
               Klasse {c.name} ({state.kids.filter((k) => k.klassId === c.id).length} Kinder){' '}
               <button
@@ -144,12 +142,7 @@ export function Admin() {
             </li>
           ))}
         </ul>
-        <input
-          value={klassEmoji}
-          style={{ width: '3em' }}
-          aria-label="Emoji für neue Klasse"
-          onChange={(e) => setKlassEmoji(e.target.value)}
-        />
+        <EmojiButton value={klassEmoji} label="Emoji für neue Klasse" onChange={setKlassEmoji} />
         <input placeholder="z.B. 1C" value={klassName} onChange={(e) => setKlassName(e.target.value)} />
         <button
           disabled={!klassName.trim()}
@@ -165,7 +158,7 @@ export function Admin() {
       <section>
         <h2>Kinder</h2>
         <h3>Kind hinzufügen</h3>
-        <input value={kidSymbol} style={{ width: '3em' }} onChange={(e) => setKidSymbol(e.target.value)} />
+        <EmojiButton value={kidSymbol} label="Symbol für neues Kind" onChange={setKidSymbol} />
         <input placeholder="Name (z.B. Mina K.)" value={kidName} onChange={(e) => setKidName(e.target.value)} />
         <select value={kidKlass} onChange={(e) => setKidKlass(e.target.value)}>
           <option value="">Klasse wählen…</option>
@@ -191,7 +184,12 @@ export function Admin() {
                 .filter((k) => k.klassId === c.id)
                 .map((k) => (
                   <li key={k.id}>
-                    {k.symbol} {k.name}{' '}
+                    <EmojiButton
+                      value={k.symbol}
+                      label={`Symbol für ${k.name}`}
+                      onChange={(symbol) => updateKid(k.id, { symbol })}
+                    />{' '}
+                    {k.name}{' '}
                     <select
                       value={k.klassId}
                       onChange={(e) => updateKid(k.id, { klassId: e.target.value })}
