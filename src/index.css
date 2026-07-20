@@ -293,6 +293,7 @@ button {
   width: 100%;
   min-height: 3rem;
   padding: 0.4rem 0.9rem;
+  margin-block: 0.25rem 1rem;
   border-radius: 999px;
   border: 2px solid var(--line);
   background: var(--card);
@@ -348,6 +349,33 @@ button {
 
 .admin section {
   margin-block: 2rem;
+}
+
+/* list rows (Klassen, Kinder): align controls and give rows breathing room */
+.admin li {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-block: 0.6rem;
+}
+
+.admin ul {
+  padding-left: 0;
+  list-style: none;
+}
+
+/* inline forms (anlegen-rows) and table buttons: consistent gaps */
+.admin section > input,
+.admin section > select,
+.admin section > button,
+.admin section > .emoji-btn {
+  margin: 0 0.4rem 0.4rem 0;
+}
+
+.admin td button,
+.admin td input {
+  margin-block: 0.15rem;
 }
 
 .admin .danger {
