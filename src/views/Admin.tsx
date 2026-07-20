@@ -1,4 +1,4 @@
-import { DoorClosed, DoorOpen, Plus, RotateCcw, School, Settings, Sprout, Trash2 } from 'lucide-react'
+import { Ban, CircleCheck, Plus, RotateCcw, School, Settings, Sprout, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import {
   addKid, addKlass, addRoom, occupancy, removeKid, removeKlass, removeRoom,
@@ -93,11 +93,11 @@ export function Admin() {
                   <button className="toggle" onClick={() => updateRoom(r.id, { isOpen: !r.isOpen })}>
                     {r.isOpen ? (
                       <>
-                        <DoorClosed className="icon-amber" /> Schließen
+                        <Ban className="icon-amber" /> Schließen
                       </>
                     ) : (
                       <>
-                        <DoorOpen className="icon-green" /> Öffnen
+                        <CircleCheck className="icon-green" /> Öffnen
                       </>
                     )}
                   </button>
