@@ -1,3 +1,4 @@
+import { Plus, Search, X } from 'lucide-react'
 import { useState } from 'react'
 import { EMOJI_CATEGORIES, searchEmojis } from './emojis'
 
@@ -29,23 +30,26 @@ export function EmojiButton({
   return (
     <>
       <button className="emoji-btn" aria-label={label} title={label} onClick={() => setOpen(true)}>
-        {value || '➕'}
+        {value || <Plus />}
       </button>
       {open && (
         <div className="overlay" onClick={() => setOpen(false)}>
           <div className="picker" onClick={(e) => e.stopPropagation()}>
             <button className="close" onClick={() => setOpen(false)} aria-label="Schließen">
-              ✕
+              <X />
             </button>
             <h2>Symbol aussuchen</h2>
-            <input
-              className="emoji-search"
-              type="search"
-              placeholder="🔍 Suchen (z.B. Eule, Fußball, blau)"
-              value={query}
-              autoFocus
-              onChange={(e) => setQuery(e.target.value)}
-            />
+            <div className="search-wrap">
+              <Search className="search-icon" />
+              <input
+                className="emoji-search"
+                type="search"
+                placeholder="Suchen (z.B. Eule, Fußball, blau)"
+                value={query}
+                autoFocus
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </div>
             {query.trim() ? (
               <section>
                 {results.length === 0 ? (

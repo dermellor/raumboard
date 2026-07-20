@@ -1,3 +1,4 @@
+import { Settings } from 'lucide-react'
 import { Seats } from '../components'
 import { roomVars } from '../roomColor'
 import { occupancy } from '../store'
@@ -10,7 +11,9 @@ export function Home() {
     <main>
       <div className="topbar">
         <h1>🏫 Lernraum-Board</h1>
-        <a href="#/admin">⚙️ Verwaltung</a>
+        <a href="#/admin">
+          <Settings className="icon-soft" /> Verwaltung
+        </a>
       </div>
 
       <h2>Klassen</h2>

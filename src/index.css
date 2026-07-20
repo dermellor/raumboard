@@ -318,6 +318,60 @@ button {
   border-color: var(--ink);
 }
 
+/* --- UI icons (lucide) --------------------------------------------------------- */
+
+button svg,
+.topbar a svg {
+  width: 1.15em;
+  height: 1.15em;
+  flex-shrink: 0;
+}
+
+.icon-h1 {
+  width: 1em;
+  height: 1em;
+}
+
+/* icon-bearing controls: center icon + text */
+.admin button,
+.topbar a,
+.picker .close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+}
+
+h1 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.icon-green { color: #16a34a; }
+.icon-amber { color: #d97706; }
+.icon-accent { color: #ea580c; }
+.icon-soft { color: var(--ink-soft); }
+
+.search-wrap {
+  position: relative;
+}
+
+.search-icon {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1.15rem;
+  height: 1.15rem;
+  color: var(--ink-soft);
+  pointer-events: none;
+}
+
+.search-wrap .emoji-search {
+  padding-left: 2.7rem;
+}
+
 /* --- add button in table header ------------------------------------------------ */
 
 .admin th.th-add,

@@ -1,3 +1,4 @@
+import { DoorClosed, DoorOpen, Plus, RotateCcw, School, Settings, Sprout, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import {
   addKid, addKlass, addRoom, occupancy, removeKid, removeKlass, removeRoom,
@@ -25,8 +26,12 @@ export function Admin() {
   return (
     <main className="admin">
       <div className="topbar">
-        <a href="#/">🏫 Start</a>
-        <h1>⚙️ Verwaltung</h1>
+        <a href="#/">
+          <School className="icon-accent" /> Start
+        </a>
+        <h1>
+          <Settings className="icon-h1" /> Verwaltung
+        </h1>
       </div>
 
       <section>
@@ -37,7 +42,7 @@ export function Admin() {
             if (confirm('Alle Kinder zurück in ihre Klassenzimmer buchen?')) reset()
           }}
         >
-          🔄 Alle zurück in die Klasse (Reset)
+          <RotateCcw /> Alle zurück in die Klasse (Reset)
         </button>{' '}
         <button
           className="danger"
@@ -45,7 +50,7 @@ export function Admin() {
             if (confirm('Alles verwerfen und die Beispieldaten neu laden?')) reseed()
           }}
         >
-          🌱 Beispieldaten neu laden
+          <Sprout /> Beispieldaten neu laden
         </button>
       </section>
 
@@ -57,7 +62,7 @@ export function Admin() {
               <th>Raum</th><th>Kapazität</th><th>Belegt</th><th>Für</th><th>Status</th>
               <th className="th-add">
                 <button className="add" aria-label="Raum hinzufügen" onClick={() => setModal('room')}>
-                  +
+                  <Plus />
                 </button>
               </th>
             </tr>
@@ -86,7 +91,15 @@ export function Admin() {
                 <td>{r.scope === 'all' ? 'alle' : `Klasse ${state.klasses.find((c) => c.id === r.scope)?.name ?? r.scope}`}</td>
                 <td>
                   <button className="toggle" onClick={() => updateRoom(r.id, { isOpen: !r.isOpen })}>
-                    {r.isOpen ? '🔒 Schließen' : '🔓 Öffnen'}
+                    {r.isOpen ? (
+                      <>
+                        <DoorClosed className="icon-amber" /> Schließen
+                      </>
+                    ) : (
+                      <>
+                        <DoorOpen className="icon-green" /> Öffnen
+                      </>
+                    )}
                   </button>
                 </td>
                 <td className="td-right">
@@ -98,7 +111,7 @@ export function Admin() {
                         removeRoom(r.id)
                     }}
                   >
-                    🗑️
+                    <Trash2 />
                   </button>
                 </td>
               </tr>
@@ -115,7 +128,7 @@ export function Admin() {
               <th>Klasse</th><th>Kinder</th>
               <th className="th-add">
                 <button className="add" aria-label="Klasse hinzufügen" onClick={() => setModal('klass')}>
-                  +
+                  <Plus />
                 </button>
               </th>
             </tr>
@@ -141,7 +154,7 @@ export function Admin() {
                         removeKlass(c.id)
                     }}
                   >
-                    🗑️
+                    <Trash2 />
                   </button>
                 </td>
               </tr>
@@ -168,7 +181,7 @@ export function Admin() {
                         setModal('kid')
                       }}
                     >
-                      +
+                      <Plus />
                     </button>
                   </th>
                 </tr>
@@ -204,7 +217,7 @@ export function Admin() {
                             if (confirm(`${k.name} löschen?`)) removeKid(k.id)
                           }}
                         >
-                          🗑️
+                          <Trash2 />
                         </button>
                       </td>
                     </tr>
