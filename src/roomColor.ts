@@ -26,6 +26,9 @@ const KNOWN: Record<string, RoomColor> = {
 }
 
 export const HOME_COLOR: RoomColor = { accent: '#EA580C', tint: '#FFEDD5' }
+
+/** CSS vars for the "own classroom" pseudo-room. */
+export const homeVars = { '--accent': HOME_COLOR.accent, '--tint': HOME_COLOR.tint } as CSSProperties
 const FLUR_COLOR: RoomColor = { accent: '#64748B', tint: '#E2E8F0' }
 
 export function roomVars(room: Room): CSSProperties {

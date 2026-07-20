@@ -1,10 +1,14 @@
+import { useState } from 'react'
 import { Seats, TopBar } from '../components'
 import { roomVars } from '../roomColor'
+import { RoomPicker } from '../RoomPicker'
 import { occupancy } from '../store'
 import { useBoard } from '../useBoard'
 
 export function RaumSicht({ roomId }: { roomId: string }) {
   const state = useBoard()
+  const [selectedKidId, setSelectedKidId] = useState<string | null>(null)
+
   const room = state.rooms.find((r) => r.id === roomId)
   if (!room)
     return (
@@ -14,6 +18,7 @@ export function RaumSicht({ roomId }: { roomId: string }) {
     )
 
   const expected = state.kids.filter((k) => k.currentRoomId === roomId)
+  const selectedKid = expected.find((k) => k.id === selectedKidId) ?? null
   const occ = occupancy(roomId, state)
 
   return (
@@ -38,15 +43,22 @@ export function RaumSicht({ roomId }: { roomId: string }) {
                 {expected
                   .filter((k) => k.klassId === c.id)
                   .map((k) => (
-                    <div key={k.id} className="tile">
+                    <button
+                      key={k.id}
+                      className="tile"
+                      aria-pressed={k.id === selectedKidId}
+                      onClick={() => setSelectedKidId(k.id === selectedKidId ? null : k.id)}
+                    >
                       <span className="emoji">{k.symbol}</span>
                       <span className="name">{k.name}</span>
-                    </div>
+                    </button>
                   ))}
               </div>
             </section>
           ))
       )}
+
+      {selectedKid && <RoomPicker kid={selectedKid} onClose={() => setSelectedKidId(null)} />}
     </main>
   )
 }

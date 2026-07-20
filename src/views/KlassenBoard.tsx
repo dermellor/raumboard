@@ -1,12 +1,8 @@
 import { useState } from 'react'
-import { Seats, TopBar } from '../components'
-import { roomVars } from '../roomColor'
-import { HOME_COLOR } from '../roomColor'
-import { book, canBook, occupancy, unbook } from '../store'
+import { TopBar } from '../components'
+import { homeVars, roomVars } from '../roomColor'
+import { RoomPicker } from '../RoomPicker'
 import { useBoard } from '../useBoard'
-import type { CSSProperties } from 'react'
-
-const homeVars = { '--accent': HOME_COLOR.accent, '--tint': HOME_COLOR.tint } as CSSProperties
 
 export function KlassenBoard({ klassId }: { klassId: string }) {
   const state = useBoard()
@@ -53,60 +49,7 @@ export function KlassenBoard({ klassId }: { klassId: string }) {
         })}
       </div>
 
-      {selectedKid && (
-        <div className="overlay" onClick={() => setSelectedKidId(null)}>
-          <div className="picker" onClick={(e) => e.stopPropagation()}>
-            <button className="close" onClick={() => setSelectedKidId(null)} aria-label="Schließen">
-              ✕
-            </button>
-            <h2>
-              Wohin gehst du, {selectedKid.symbol} {selectedKid.name}?
-            </h2>
-            <div className="tiles">
-              <button
-                className="tile room-tile"
-                style={homeVars}
-                disabled={selectedKid.currentRoomId === null}
-                onClick={() => {
-                  unbook(selectedKid.id)
-                  setSelectedKidId(null)
-                }}
-              >
-                <span className="emoji">🏠</span>
-                <span className="name">Eigenes Klassenzimmer</span>
-              </button>
-              {state.rooms
-                .filter((r) => r.scope === 'all' || r.scope === klassId)
-                .map((room) => {
-                  const check = canBook(selectedKid, room, state)
-                  const here = selectedKid.currentRoomId === room.id
-                  return (
-                    <button
-                      key={room.id}
-                      className="tile room-tile"
-                      style={roomVars(room)}
-                      disabled={here || !check.ok}
-                      onClick={() => {
-                        const result = book(selectedKid.id, room.id)
-                        if (result.ok) setSelectedKidId(null)
-                      }}
-                    >
-                      <span className="emoji">{room.emoji}</span>
-                      <span className="name">{room.name}</span>
-                      {here ? (
-                        <span className="reason">Du bist schon hier</span>
-                      ) : check.ok ? (
-                        <Seats capacity={room.capacity} occupied={occupancy(room.id, state)} />
-                      ) : (
-                        <span className="reason">{check.reason}</span>
-                      )}
-                    </button>
-                  )
-                })}
-            </div>
-          </div>
-        </div>
-      )}
+      {selectedKid && <RoomPicker kid={selectedKid} onClose={() => setSelectedKidId(null)} />}
 
       <h2>Unterwegs sind gerade:</h2>
       <div className="tiles">
