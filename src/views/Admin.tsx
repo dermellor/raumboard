@@ -85,19 +85,20 @@ export function Admin() {
                 <td>{occupancy(r.id, state)}</td>
                 <td>{r.scope === 'all' ? 'alle' : `Klasse ${state.klasses.find((c) => c.id === r.scope)?.name ?? r.scope}`}</td>
                 <td>
-                  <button onClick={() => updateRoom(r.id, { isOpen: !r.isOpen })}>
-                    {r.isOpen ? 'offen → schließen' : 'geschlossen → öffnen'}
+                  <button className="toggle" onClick={() => updateRoom(r.id, { isOpen: !r.isOpen })}>
+                    {r.isOpen ? '🔒 Schließen' : '🔓 Öffnen'}
                   </button>
                 </td>
-                <td>
+                <td className="td-right">
                   <button
-                    className="danger"
+                    className="add danger"
+                    aria-label={`Raum ${r.name} löschen`}
                     onClick={() => {
                       if (confirm(`Raum „${r.name}" löschen? Eingebuchte Kinder gehen zurück in die Klasse.`))
                         removeRoom(r.id)
                     }}
                   >
-                    löschen
+                    🗑️
                   </button>
                 </td>
               </tr>
@@ -131,15 +132,16 @@ export function Admin() {
                   Klasse {c.name}
                 </td>
                 <td>{state.kids.filter((k) => k.klassId === c.id).length}</td>
-                <td>
+                <td className="td-right">
                   <button
-                    className="danger"
+                    className="add danger"
+                    aria-label={`Klasse ${c.name} löschen`}
                     onClick={() => {
                       if (confirm(`Klasse ${c.name} samt allen Kindern und klassengebundenen Räumen löschen?`))
                         removeKlass(c.id)
                     }}
                   >
-                    löschen
+                    🗑️
                   </button>
                 </td>
               </tr>
@@ -194,14 +196,15 @@ export function Admin() {
                           ))}
                         </select>
                       </td>
-                      <td>
+                      <td className="td-right">
                         <button
-                          className="danger"
+                          className="add danger"
+                          aria-label={`${k.name} löschen`}
                           onClick={() => {
                             if (confirm(`${k.name} löschen?`)) removeKid(k.id)
                           }}
                         >
-                          löschen
+                          🗑️
                         </button>
                       </td>
                     </tr>

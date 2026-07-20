@@ -320,8 +320,15 @@ button {
 
 /* --- add button in table header ------------------------------------------------ */
 
-.admin th.th-add {
+.admin th.th-add,
+.admin td.td-right {
   text-align: right;
+}
+
+/* open/close toggle: fixed width so the column doesn't jump */
+.admin button.toggle {
+  min-width: 9.5rem;
+  text-align: center;
 }
 
 .add {
