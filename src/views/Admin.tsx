@@ -69,7 +69,7 @@ export function Admin() {
           </thead>
           <tbody>
             {state.rooms.map((r) => (
-              <tr key={r.id}>
+              <tr key={r.id} className={r.isOpen ? undefined : 'closed'}>
                 <td>
                   <EmojiButton
                     value={r.emoji}

@@ -158,6 +158,12 @@ button {
   background: var(--card);
 }
 
+/* closed rooms in the admin table */
+.admin tr.closed td {
+  background: #f3f1ea;
+  color: var(--ink-soft);
+}
+
 .reason {
   font-size: 0.85rem;
   color: var(--ink-soft);
