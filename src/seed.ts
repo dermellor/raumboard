@@ -73,6 +73,10 @@ function buildRooms(): Room[] {
 }
 
 export function buildSeed(): BoardState {
-  const klasses: Klass[] = KLASS_NAMES.map((name) => ({ id: klassId(name), name }))
+  const klasses: Klass[] = KLASS_NAMES.map((name) => ({
+    id: klassId(name),
+    name,
+    emoji: KLASS_THEMES[name][0],
+  }))
   return { klasses, kids: buildKids(), rooms: buildRooms() }
 }

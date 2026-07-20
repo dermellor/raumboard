@@ -1,6 +1,7 @@
 export type Klass = {
   id: string
   name: string // "1A" … "4B"
+  emoji?: string // optional so pre-existing localStorage states stay valid
 }
 
 export type Kid = {

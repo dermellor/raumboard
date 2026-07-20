@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
   addKid, addKlass, addRoom, occupancy, removeKid, removeKlass, removeRoom,
-  reseed, reset, updateKid, updateRoom,
+  reseed, reset, updateKid, updateKlass, updateRoom,
 } from '../store'
 import { useBoard } from '../useBoard'
 
@@ -15,6 +15,7 @@ export function Admin() {
   const [kidSymbol, setKidSymbol] = useState('⭐')
   const [kidKlass, setKidKlass] = useState('')
   const [klassName, setKlassName] = useState('')
+  const [klassEmoji, setKlassEmoji] = useState('🚪')
 
   return (
     <main className="admin">
@@ -54,7 +55,15 @@ export function Admin() {
           <tbody>
             {state.rooms.map((r) => (
               <tr key={r.id}>
-                <td>{r.emoji} {r.name}</td>
+                <td>
+                  <input
+                    value={r.emoji}
+                    style={{ width: '3em' }}
+                    aria-label={`Emoji für ${r.name}`}
+                    onChange={(e) => updateRoom(r.id, { emoji: e.target.value })}
+                  />{' '}
+                  {r.name}
+                </td>
                 <td>
                   <input
                     type="number"
@@ -115,6 +124,13 @@ export function Admin() {
         <ul>
           {state.klasses.map((c) => (
             <li key={c.id}>
+              <input
+                value={c.emoji ?? ''}
+                placeholder="⭐"
+                style={{ width: '3em' }}
+                aria-label={`Emoji für Klasse ${c.name}`}
+                onChange={(e) => updateKlass(c.id, { emoji: e.target.value })}
+              />{' '}
               Klasse {c.name} ({state.kids.filter((k) => k.klassId === c.id).length} Kinder){' '}
               <button
                 className="danger"
@@ -128,11 +144,17 @@ export function Admin() {
             </li>
           ))}
         </ul>
+        <input
+          value={klassEmoji}
+          style={{ width: '3em' }}
+          aria-label="Emoji für neue Klasse"
+          onChange={(e) => setKlassEmoji(e.target.value)}
+        />
         <input placeholder="z.B. 1C" value={klassName} onChange={(e) => setKlassName(e.target.value)} />
         <button
           disabled={!klassName.trim()}
           onClick={() => {
-            addKlass(klassName.trim())
+            addKlass(klassName.trim(), klassEmoji || undefined)
             setKlassName('')
           }}
         >

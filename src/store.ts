@@ -1,5 +1,5 @@
 import { buildSeed } from './seed'
-import type { BoardState, BookResult, Kid, Room } from './types'
+import type { BoardState, BookResult, Kid, Klass, Room } from './types'
 
 // Phase-1 store: in-memory state + localStorage persistence + cross-tab sync
 // via the `storage` event. The exported functions are the contract for the
@@ -160,8 +160,15 @@ export function removeKid(kidId: string): void {
   commit({ ...state, kids: state.kids.filter((k) => k.id !== kidId) })
 }
 
-export function addKlass(name: string): void {
-  commit({ ...state, klasses: [...state.klasses, { id: slug(name), name }] })
+export function addKlass(name: string, emoji?: string): void {
+  commit({ ...state, klasses: [...state.klasses, { id: slug(name), name, emoji }] })
+}
+
+export function updateKlass(klassId: string, patch: Partial<Pick<Klass, 'name' | 'emoji'>>): void {
+  commit({
+    ...state,
+    klasses: state.klasses.map((c) => (c.id === klassId ? { ...c, ...patch } : c)),
+  })
 }
 
 export function removeKlass(klassId: string): void {

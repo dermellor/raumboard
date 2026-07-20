@@ -25,7 +25,7 @@ export function KlassenBoard({ klassId }: { klassId: string }) {
 
   return (
     <main>
-      <TopBar title={`Klasse ${klass.name}`} />
+      <TopBar title={`${klass.emoji ? `${klass.emoji} ` : ''}Klasse ${klass.name}`} />
 
       <div className="tiles">
         {kids.map((kid) => {

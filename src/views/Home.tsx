@@ -21,7 +21,7 @@ export function Home() {
           return (
             <a key={c.id} href={`#/klasse/${c.id}`}>
               <div className="tile">
-                <span className="emoji">{kids[0]?.symbol ?? '🚪'}</span>
+                <span className="emoji">{c.emoji || kids[0]?.symbol || '🚪'}</span>
                 <span className="name">Klasse {c.name}</span>
                 <span className="count">
                   {away > 0 ? `${away} von ${kids.length} unterwegs` : `${kids.length} Kinder`}
