@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { EMOJI_CATEGORIES } from './emojis'
+import { EMOJI_CATEGORIES, searchEmojis } from './emojis'
 
 /**
  * Emoji field with a built-in touch picker: tap the emoji, tap a new one.
- * Whiteboards and school PCs have no emoji keyboard, so free-text is only
- * offered as a fallback inside the picker.
+ * Whiteboards and school PCs have no emoji keyboard, so the picker offers
+ * browsing by category plus a German keyword search.
  */
 export function EmojiButton({
   value,
@@ -16,13 +16,15 @@ export function EmojiButton({
   label: string
 }) {
   const [open, setOpen] = useState(false)
-  const [custom, setCustom] = useState('')
+  const [query, setQuery] = useState('')
 
   const pick = (emoji: string) => {
     onChange(emoji)
     setOpen(false)
-    setCustom('')
+    setQuery('')
   }
+
+  const results = searchEmojis(query)
 
   return (
     <>
@@ -36,33 +38,42 @@ export function EmojiButton({
               ✕
             </button>
             <h2>Symbol aussuchen</h2>
-            {EMOJI_CATEGORIES.map((cat) => (
-              <section key={cat.name}>
-                <h3>{cat.name}</h3>
-                <div className="emoji-grid">
-                  {cat.emojis.map((e) => (
-                    <button
-                      key={e}
-                      aria-pressed={e === value}
-                      onClick={() => pick(e)}
-                    >
-                      {e}
-                    </button>
-                  ))}
-                </div>
+            <input
+              className="emoji-search"
+              type="search"
+              placeholder="🔍 Suchen (z.B. Eule, Fußball, blau)"
+              value={query}
+              autoFocus
+              onChange={(e) => setQuery(e.target.value)}
+            />
+            {query.trim() ? (
+              <section>
+                {results.length === 0 ? (
+                  <p className="count">Nichts gefunden. Anders schreiben oder unten stöbern:</p>
+                ) : (
+                  <div className="emoji-grid">
+                    {results.map((e) => (
+                      <button key={e} aria-pressed={e === value} onClick={() => pick(e)}>
+                        {e}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </section>
-            ))}
-            <section>
-              <h3>Eigenes Zeichen</h3>
-              <input
-                value={custom}
-                placeholder="hier eintippen"
-                onChange={(e) => setCustom(e.target.value)}
-              />{' '}
-              <button disabled={!custom.trim()} onClick={() => pick(custom.trim())}>
-                übernehmen
-              </button>
-            </section>
+            ) : null}
+            {(!query.trim() || results.length === 0) &&
+              EMOJI_CATEGORIES.map((cat) => (
+                <section key={cat.name}>
+                  <h3>{cat.name}</h3>
+                  <div className="emoji-grid">
+                    {cat.emojis.map((e) => (
+                      <button key={e} aria-pressed={e === value} onClick={() => pick(e)}>
+                        {e}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              ))}
           </div>
         </div>
       )}

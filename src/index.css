@@ -289,6 +289,16 @@ button {
   background: var(--card);
 }
 
+.emoji-search {
+  width: 100%;
+  min-height: 3rem;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  border: 2px solid var(--line);
+  background: var(--card);
+  font: inherit;
+}
+
 .emoji-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(3.2rem, 1fr));
