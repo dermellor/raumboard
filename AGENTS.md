@@ -105,8 +105,20 @@ Port block **3210–3219** — see `~/Development/PORTS.md`.
 `npm run dev:pm2` (no prep script). Local HTTPS URL: `https://lernraum.localhost`
 (Caddy, see `~/Development/.dev-stack/`).
 
-## Deploy (prototype)
+## Deploy
 
-`npm run build && python3 scripts/deploy-bunny.py` — uploads `dist/` to Bunny
-Storage zone `lernraum-board`, purges the pull zone. Storage password lives in
-`~/_AGENTS/.env` (`LERNRAUM_STORAGE_PASSWORD`), account key `BUNNY_ACCOUNT_API_KEY`.
+**Hosted (production):** `bash deploy/deploy.sh` — builds the frontend, rsyncs
+`dist/ server/ src/ package*.json` to `deploy-host:/opt/raumboard/app`, runs
+`npm ci --omit=dev`, restarts the `raumboard` systemd service. Server layout:
+`/opt/raumboard/{app,data,backups}`, env in `/opt/raumboard/.env` (secret,
+domain, Bunny backup password — never in the repo or chat). Caddy terminates
+TLS: on-demand certs per school subdomain via `GET /ask` (see
+`/etc/caddy/Caddyfile`, backup at `Caddyfile.bak-raumboard`). Nightly backups:
+`raumboard-backup.timer` → Bunny Storage zone `raumboard-backups` (14 days).
+Tenant admin on the server:
+`cd /opt/raumboard/app && ./node_modules/.bin/tsx server/cli.ts create-school|reset-credentials|list`
+(credentials land in `/opt/raumboard/credentials-<slug>.txt`).
+
+**Demo prototype (static):** `npm run build && python3 scripts/deploy-bunny.py`
+— uploads `dist/` to Bunny Storage zone `lernraum-board`
+(https://lernraum-board.b-cdn.net), runs in demo mode (localStorage).
