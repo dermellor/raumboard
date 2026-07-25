@@ -1,21 +1,64 @@
-# lernraum-board
+# Raumboard
 
-Room-booking board for Beispielschule (primary school, NRW). During the
-first three lessons of the day, kids book themselves out of their classroom into
-learning spaces (Lernateliers, library, hallway desks, garden, foyer). Boards run
-on digital classroom whiteboards, PCs, and iPads via plain URLs. Replaces a
-macro-based Excel sheet maintained by the principal.
+**Product name: Raumboard · domain: raumboard.de** (repo/dir still `lernraum-board`
+for local-infra stability; rename is cosmetic and can happen with the Phase-2 repo
+publication).
+
+Room-booking board for primary schools with open learning concepts ("Pädagogische
+Architektur"): kids book themselves out of their classroom into learning spaces
+(Lernateliers, library, hallway desks, garden, foyer) during self-directed learning
+time. Boards run on digital classroom whiteboards, PCs, and iPads via plain URLs.
+First school: Beispielschule, NRW (principal N.N., also part of the
+QUA-LiS NRW "Pädagogische Architektur" advisor team — distribution channel).
+
+## Vision & tracks (decided 2026-07)
+
+- **No paid SaaS.** Open source; any tech-savvy school (or parent) can self-host.
+- **Track A — Open source:** public repo, Docker image, self-hosting docs marked
+  "experimental, no support" while the product iterates fast.
+- **Track B — Hosted by Marcel, free:** classic login, multiple schools on one
+  deployment so updates land everywhere at once. Early schools go here.
+- Positioning: the *daily-operations layer* of Pädagogische Architektur — the
+  planning/building world (QUA-LiS, Montag Stiftung) has no tool for "who learns
+  where right now". Content vocabulary: Lernorte, Lernlandschaft, Cluster,
+  Lernatelier, Selbstlernzeit, "Dem Lernen Raum geben", dritter Pädagoge.
+
+## Target architecture (Phase 2+)
+
+- **One codebase, tenant = subdomain, one SQLite file per school**
+  (`beispielschule.raumboard.de` → `data/beispielschule.db`). Self-hosting = same app
+  with a single default tenant. No tenant columns anywhere.
+- **Server:** Hetzner VPS (Falkenstein), Caddy (wildcard cert `*.raumboard.de`),
+  Node/Hono, WebSockets for realtime, Litestream backup per school DB to Bunny
+  Storage. Bunny CDN stays for static assets/prototype.
+- **Auth:** per school one admin login (email + password, Argon2, cookie session)
+  for Verwaltung + one teacher PIN that unlocks class boards per device. Kids
+  never log in. Onboarding/reset manual by Marcel in the early phase.
+- **Data minimization:** first name + initial only, never full names.
+- **AVV/DSGVO:** hosting for schools makes Marcel an Auftragsverarbeiter even for
+  free — AVV template + TOM doc required before first real kid data.
 
 ## Status / roadmap
 
-- **Phase 1 (current):** clickable UI prototype, deliberately unstyled, no backend.
-  State lives in `localStorage`; cross-tab sync via the `storage` event simulates
-  realtime for demos.
-- **Phase 2:** TypeScript fetch-handler API (locally via Deno on port 3211),
-  deployed to Bunny Edge Scripting; WebSockets for push; Bunny Database (libSQL).
-- **Phase 3:** static frontend on Bunny CDN, nightly DB dump to Bunny Storage,
-  handover docs for the school.
-- **Phase 4:** kid-friendly styling (large touch tiles, room colors), auto-reset.
+- **Phase 1 (done):** clickable prototype, localStorage store, cross-tab sync via
+  `storage` event, kid-friendly design, emoji picker with German search, admin
+  tables with modals. Deployed to https://lernraum-board.b-cdn.net (Bunny Storage
+  + Pull Zone, deploy via `scripts/deploy-bunny.py`).
+- **Phase 2 (next, target: NRW school-year start, ~mid-August 2026):** backend
+  (Hono + SQLite + WS, local port 3211), tenant-by-subdomain, admin login +
+  teacher PIN (N.N. wishlist), Hetzner deploy, raumboard.de DNS, Beispielschule
+  as first tenant.
+- **Phase 3:** Excel/CSV import+export of class lists (school-year start flow),
+  backup automation, AVV template + DSGVO docs.
+- **Phase 4:** public repo, Docker/Compose self-hosting path, demo mode as
+  showcase (current localStorage store stays as the demo/offline mode).
+
+## Feedback backlog (N.N. mail 2026-07-21)
+
+- Password protection for Verwaltung → Phase 2 auth
+- Protect class boards from kid mischief → teacher PIN
+- Easy room adding → done (admin modal)
+- Import kids/whole classes at school-year start (Excel) → Phase 3
 
 ## Privacy rule (hard)
 
@@ -23,10 +66,11 @@ Never commit real children's names. Seeds and fixtures use generated dummy names
 only (emoji symbol + first name + last-name initial, mirroring the original
 sheet's structure). The school enters real data in production only.
 
-## Architecture
+## Architecture (current, Phase 1)
 
-- Vite + React 19 + TypeScript, no runtime deps beyond react/react-dom.
-  No router package (tiny hash router), no state package (own store).
+- Vite + React 19 + TypeScript; runtime deps: react, react-dom, lucide-react
+  (UI icons — content emojis stay emojis). No router package (tiny hash router),
+  no state package (own store).
 - `src/types.ts` — domain model: `Klass`, `Kid`, `Room`. `Kid.currentRoomId = null`
   means "in own classroom". Room `scope` is `'all'` or a `klassId` (class-bound
   hallway desks). Occupancy is always derived, never stored.
@@ -37,6 +81,9 @@ sheet's structure). The school enters real data in production only.
   14 rooms.
 - `src/views/` — `Home` (`#/`), `KlassenBoard` (`#/klasse/:id`), `RaumSicht`
   (`#/raum/:id`), `Admin` (`#/admin`).
+- `src/RoomPicker.tsx` — shared "Wohin gehst du?" overlay (class board + room view).
+- `src/EmojiButton.tsx` + `src/emojis.ts` — offline emoji picker with German
+  keyword search.
 
 ## Booking rules
 
@@ -57,3 +104,9 @@ Port block **3210–3219** — see `~/Development/PORTS.md`.
 `npm run dev` runs `scripts/dev-prep.sh` (port-conflict check) first. PM2 uses
 `npm run dev:pm2` (no prep script). Local HTTPS URL: `https://lernraum.localhost`
 (Caddy, see `~/Development/.dev-stack/`).
+
+## Deploy (prototype)
+
+`npm run build && python3 scripts/deploy-bunny.py` — uploads `dist/` to Bunny
+Storage zone `lernraum-board`, purges the pull zone. Storage password lives in
+`~/_AGENTS/.env` (`LERNRAUM_STORAGE_PASSWORD`), account key `BUNNY_ACCOUNT_API_KEY`.

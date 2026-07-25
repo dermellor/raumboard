@@ -10,7 +10,7 @@ export function Home() {
   return (
     <main>
       <div className="topbar">
-        <h1>🏫 Lernraum-Board</h1>
+        <h1>🏫 Raumboard</h1>
         <a href="#/admin">
           <Settings className="icon-soft" /> Verwaltung
         </a>
