@@ -6,22 +6,31 @@
   "scripts": {
     "dev": "bash scripts/dev-prep.sh && vite",
     "dev:pm2": "vite",
+    "dev:api": "RAUMBOARD_DEFAULT_TENANT=dev tsx watch server/index.ts",
+    "dev:full": "bash scripts/dev-prep.sh && VITE_API=true vite",
     "dev:worktree": "vite --strictPort --port ${WT_PORT:-32100}",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@hono/node-server": "^2.0.11",
+    "better-sqlite3": "^13.0.1",
+    "hono": "^4.12.32",
     "lucide-react": "^1.25.0",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react-dom": "^19.2.7",
+    "ws": "^8.21.1"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
+    "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^6.0.3",
     "oxlint": "^1.71.0",
+    "tsx": "^4.23.1",
     "typescript": "~6.0.2",
     "vite": "^8.1.1"
   }
