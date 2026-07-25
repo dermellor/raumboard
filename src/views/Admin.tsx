@@ -1,17 +1,19 @@
-import { Ban, CircleCheck, Plus, RotateCcw, School, Settings, Sprout, Trash2 } from 'lucide-react'
+import { Ban, CircleCheck, LogOut, Plus, RotateCcw, School, Settings, Sprout, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import {
-  addKid, addKlass, addRoom, occupancy, removeKid, removeKlass, removeRoom,
+  addKid, addKlass, addRoom, logout, occupancy, removeKid, removeKlass, removeRoom,
   reseed, reset, updateKid, updateKlass, updateRoom,
 } from '../store'
 import { EmojiButton } from '../EmojiButton'
 import { Modal } from '../components'
-import { useBoard } from '../useBoard'
+import { useBoard, useMeta } from '../useBoard'
+import { Login } from './Login'
 
 type AdminModal = 'room' | 'klass' | 'kid' | null
 
 export function Admin() {
   const state = useBoard()
+  const meta = useMeta()
   const [modal, setModal] = useState<AdminModal>(null)
   const [roomName, setRoomName] = useState('')
   const [roomEmoji, setRoomEmoji] = useState('🚪')
@@ -23,6 +25,8 @@ export function Admin() {
   const [klassName, setKlassName] = useState('')
   const [klassEmoji, setKlassEmoji] = useState('🚪')
 
+  if (meta.mode === 'api' && !meta.isAdmin) return <Login />
+
   return (
     <main className="admin">
       <div className="topbar">
@@ -32,6 +36,11 @@ export function Admin() {
         <h1>
           <Settings className="icon-h1" /> Verwaltung
         </h1>
+        {meta.mode === 'api' && (
+          <button className="logout" onClick={() => void logout()}>
+            <LogOut /> Abmelden
+          </button>
+        )}
       </div>
 
       <section>
@@ -44,14 +53,16 @@ export function Admin() {
         >
           <RotateCcw /> Alle zurück in die Klasse (Reset)
         </button>{' '}
-        <button
-          className="danger"
-          onClick={() => {
-            if (confirm('Alles verwerfen und die Beispieldaten neu laden?')) reseed()
-          }}
-        >
-          <Sprout /> Beispieldaten neu laden
-        </button>
+        {meta.mode === 'demo' && (
+          <button
+            className="danger"
+            onClick={() => {
+              if (confirm('Alles verwerfen und die Beispieldaten neu laden?')) reseed()
+            }}
+          >
+            <Sprout /> Beispieldaten neu laden
+          </button>
+        )}
       </section>
 
       <section>

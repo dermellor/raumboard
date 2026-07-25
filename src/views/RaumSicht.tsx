@@ -1,13 +1,16 @@
 import { useState } from 'react'
 import { Seats, TopBar } from '../components'
+import { PinGate } from '../PinGate'
 import { roomVars } from '../roomColor'
 import { RoomPicker } from '../RoomPicker'
 import { occupancy } from '../store'
-import { useBoard } from '../useBoard'
+import { useBoard, useMeta } from '../useBoard'
 
 export function RaumSicht({ roomId }: { roomId: string }) {
   const state = useBoard()
+  const meta = useMeta()
   const [selectedKidId, setSelectedKidId] = useState<string | null>(null)
+  const [showPin, setShowPin] = useState(false)
 
   const room = state.rooms.find((r) => r.id === roomId)
   if (!room)
@@ -47,7 +50,10 @@ export function RaumSicht({ roomId }: { roomId: string }) {
                       key={k.id}
                       className="tile"
                       aria-pressed={k.id === selectedKidId}
-                      onClick={() => setSelectedKidId(k.id === selectedKidId ? null : k.id)}
+                      onClick={() => {
+                        if (!meta.canBook) return setShowPin(true)
+                        setSelectedKidId(k.id === selectedKidId ? null : k.id)
+                      }}
                     >
                       <span className="emoji">{k.symbol}</span>
                       <span className="name">{k.name}</span>
@@ -58,6 +64,7 @@ export function RaumSicht({ roomId }: { roomId: string }) {
           ))
       )}
 
+      {showPin && <PinGate onClose={() => setShowPin(false)} />}
       {selectedKid && <RoomPicker kid={selectedKid} onClose={() => setSelectedKidId(null)} />}
     </main>
   )

@@ -1,12 +1,15 @@
 import { useState } from 'react'
 import { TopBar } from '../components'
+import { PinGate } from '../PinGate'
 import { homeVars, roomVars } from '../roomColor'
 import { RoomPicker } from '../RoomPicker'
-import { useBoard } from '../useBoard'
+import { useBoard, useMeta } from '../useBoard'
 
 export function KlassenBoard({ klassId }: { klassId: string }) {
   const state = useBoard()
+  const meta = useMeta()
   const [selectedKidId, setSelectedKidId] = useState<string | null>(null)
+  const [showPin, setShowPin] = useState(false)
 
   const klass = state.klasses.find((c) => c.id === klassId)
   if (!klass)
@@ -31,7 +34,10 @@ export function KlassenBoard({ klassId }: { klassId: string }) {
               key={kid.id}
               className="tile"
               aria-pressed={kid.id === selectedKidId}
-              onClick={() => setSelectedKidId(kid.id === selectedKidId ? null : kid.id)}
+              onClick={() => {
+                if (!meta.canBook) return setShowPin(true)
+                setSelectedKidId(kid.id === selectedKidId ? null : kid.id)
+              }}
             >
               <span className="emoji">{kid.symbol}</span>
               <span className="name">{kid.name}</span>
@@ -49,6 +55,7 @@ export function KlassenBoard({ klassId }: { klassId: string }) {
         })}
       </div>
 
+      {showPin && <PinGate onClose={() => setShowPin(false)} />}
       {selectedKid && <RoomPicker kid={selectedKid} onClose={() => setSelectedKidId(null)} />}
 
       <h2>Unterwegs sind gerade:</h2>

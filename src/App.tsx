@@ -1,4 +1,5 @@
 import { useRoute } from './router'
+import { useMeta } from './useBoard'
 import { Admin } from './views/Admin'
 import { Home } from './views/Home'
 import { KlassenBoard } from './views/KlassenBoard'
@@ -6,6 +7,14 @@ import { RaumSicht } from './views/RaumSicht'
 
 export function App() {
   const route = useRoute()
+  const meta = useMeta()
+
+  if (!meta.ready)
+    return (
+      <main>
+        <p>Lädt …</p>
+      </main>
+    )
   switch (route.view) {
     case 'klasse':
       return <KlassenBoard klassId={route.id} />

@@ -110,15 +110,16 @@ export function addRoom(
 }
 
 export function updateRoom(db: Database.Database, roomId: string, patch: Partial<Room>): void {
-  const sets: string[] = []
-  const args: unknown[] = []
-  if (patch.name !== undefined) (sets.push('name = ?'), args.push(patch.name))
-  if (patch.emoji !== undefined) (sets.push('emoji = ?'), args.push(patch.emoji))
-  if (patch.capacity !== undefined) (sets.push('capacity = ?'), args.push(Math.max(0, patch.capacity)))
-  if (patch.isOpen !== undefined) (sets.push('is_open = ?'), args.push(patch.isOpen ? 1 : 0))
-  if (patch.scope !== undefined) (sets.push('scope = ?'), args.push(patch.scope))
-  if (!sets.length) return
-  db.prepare(`UPDATE rooms SET ${sets.join(', ')} WHERE id = ?`).run(...args, roomId)
+  const fields: Record<string, unknown> = {}
+  if (patch.name !== undefined) fields.name = patch.name
+  if (patch.emoji !== undefined) fields.emoji = patch.emoji
+  if (patch.capacity !== undefined) fields.capacity = Math.max(0, patch.capacity)
+  if (patch.isOpen !== undefined) fields.is_open = patch.isOpen ? 1 : 0
+  if (patch.scope !== undefined) fields.scope = patch.scope
+  const keys = Object.keys(fields)
+  if (!keys.length) return
+  const sets = keys.map((k) => `${k} = ?`).join(', ')
+  db.prepare(`UPDATE rooms SET ${sets} WHERE id = ?`).run(...keys.map((k) => fields[k]), roomId)
 }
 
 export function removeRoom(db: Database.Database, roomId: string): void {

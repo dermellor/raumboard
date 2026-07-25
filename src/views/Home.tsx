@@ -2,15 +2,16 @@ import { Settings } from 'lucide-react'
 import { Seats } from '../components'
 import { roomVars } from '../roomColor'
 import { occupancy } from '../store'
-import { useBoard } from '../useBoard'
+import { useBoard, useMeta } from '../useBoard'
 
 export function Home() {
   const state = useBoard()
+  const meta = useMeta()
 
   return (
     <main>
       <div className="topbar">
-        <h1>🏫 Raumboard</h1>
+        <h1>🏫 {meta.mode === 'api' && meta.schoolName ? meta.schoolName : 'Raumboard'}</h1>
         <a href="#/admin">
           <Settings className="icon-soft" /> Verwaltung
         </a>

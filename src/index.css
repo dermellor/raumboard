@@ -406,16 +406,30 @@ h1 {
   width: min(28rem, 100%);
 }
 
-.modal .field {
+.field {
   display: flex;
   align-items: center;
   gap: 0.6rem;
   margin-block: 0.75rem;
 }
 
-.modal .field label {
+.field label {
   min-width: 6.5rem;
   font-weight: 600;
+}
+
+.form-error {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.topbar .logout {
+  margin-left: auto;
+  min-height: 3rem;
+  padding: 0.4rem 1rem;
+  border-radius: 999px;
+  border: 2px solid var(--line);
+  background: var(--card);
 }
 
 /* --- admin (functional, calm) ----------------------------------------------- */
