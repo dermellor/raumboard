@@ -4,12 +4,16 @@
 
 set -e
 
-PORTS="3210"
+PORTS="3210 3211"  # 3210 = Vite (web), 3211 = API server
 # Only a real *listener* blocks binding to the port. Match `-sTCP:LISTEN` so we
 # don't trip over leftover client sockets in CLOSED/TIME_WAIT state — those
 # don't prevent a new server from listening, and killing their owner would take
 # down the wrong process.
-PIDS=$(lsof -ti:$PORTS -sTCP:LISTEN 2>/dev/null || true)
+PIDS=""
+for p in $PORTS; do
+  PIDS="$PIDS $(lsof -ti:$p -sTCP:LISTEN 2>/dev/null || true)"
+done
+PIDS=$(echo $PIDS | xargs 2>/dev/null || true)
 
 if [ -n "$PIDS" ]; then
   echo "Port $PORTS ist belegt:"
@@ -29,7 +33,9 @@ if [ -n "$PIDS" ]; then
     kill $PIDS 2>/dev/null || true
     for i in 1 2 3 4 5; do
       sleep 0.2
-      [ -z "$(lsof -ti:$PORTS -sTCP:LISTEN 2>/dev/null)" ] && break
+      still=""
+      for p in $PORTS; do still="$still$(lsof -ti:$p -sTCP:LISTEN 2>/dev/null || true)"; done
+      [ -z "$still" ] && break
     done
     echo "Gekillt."
   else

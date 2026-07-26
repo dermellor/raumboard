@@ -4,10 +4,11 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "bash scripts/dev-prep.sh && vite",
-    "dev:pm2": "vite",
-    "dev:api": "RAUMBOARD_DEFAULT_TENANT=dev tsx watch server/index.ts",
-    "dev:full": "bash scripts/dev-prep.sh && VITE_API=true vite",
+    "dev": "bash scripts/dev-prep.sh && concurrently -k -n api,web -c blue,cyan \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:pm2": "concurrently -k -n api,web -c blue,cyan \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "RAUMBOARD_DEFAULT_TENANT=dev RAUMBOARD_DEV=1 tsx watch server/index.ts",
+    "dev:web": "VITE_API=true vite",
+    "dev:demo": "vite",
     "dev:worktree": "vite --strictPort --port ${WT_PORT:-32100}",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
@@ -30,6 +31,7 @@
     "@types/react-dom": "^19.2.3",
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^6.0.3",
+    "concurrently": "^10.0.4",
     "oxlint": "^1.71.0",
     "typescript": "~6.0.2",
     "vite": "^8.1.1"

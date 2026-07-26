@@ -101,9 +101,13 @@ Port block **3210–3219** — see `~/Development/PORTS.md`.
 | 3211  | reserved: local API (Phase 2)    |
 | 32100–32109 | worktree preview pool (`npm run dev:worktree`, `WT_PORT`) |
 
-`npm run dev` runs `scripts/dev-prep.sh` (port-conflict check) first. PM2 uses
-`npm run dev:pm2` (no prep script). Local HTTPS URL: `https://lernraum.localhost`
-(Caddy, see `~/Development/.dev-stack/`).
+**Local dev runs the real API stack, not demo mode.** `npm run dev` (and the PM2
+`dev:pm2`) start API server + Vite concurrently in API mode with HMR. With
+`RAUMBOARD_DEV=1` (set by `dev:api`, guarded by `!PROD`) the server auto-provisions
+the `dev` tenant with seed data and fixed local credentials:
+**login `dev@raumboard.local` / `raumboard`, teacher PIN `0000`**. Local HTTPS URL:
+`https://raumboard.localhost` (Caddy → Vite 3210 → proxies `/api` + WS to API 3211).
+`npm run dev:demo` runs the old frontend-only localStorage mode if ever needed.
 
 ## Deploy
 

@@ -8,13 +8,33 @@ import { fileURLToPath } from 'node:url'
 import { WebSocketServer } from 'ws'
 import * as board from './board'
 import { hashSecret, makeToken, verifySecret, verifyToken } from './auth'
-import { BASE_DOMAIN, openTenant, slugFromHost, tenantExists } from './tenant'
+import { BASE_DOMAIN, DEFAULT_TENANT, openTenant, slugFromHost, tenantExists } from './tenant'
 import { broadcast, register } from './ws'
+import { buildSeed } from '../src/seed'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const DIST = path.join(HERE, '..', 'dist')
 const PORT = Number(process.env.RAUMBOARD_PORT ?? 3211)
 const PROD = process.env.NODE_ENV === 'production'
+
+// Local development convenience: with `RAUMBOARD_DEV=1` (set by `npm run dev:api`,
+// never in production) auto-provision the default tenant with seed data and known
+// credentials, so the real API mode "just works" locally without deploying or CLI.
+// Guarded by !PROD so a self-hosted single-tenant production install is untouched.
+const DEV = process.env.RAUMBOARD_DEV === '1' && !PROD
+if (DEV && DEFAULT_TENANT) {
+  const fresh = !tenantExists(DEFAULT_TENANT)
+  const db = openTenant(DEFAULT_TENANT, { create: true })
+  if (fresh) {
+    board.replaceAll(db, buildSeed())
+    board.setConfig(db, 'school_name', 'Lokale Testschule')
+  }
+  // known dev credentials (idempotent; keeps board data across restarts)
+  board.setConfig(db, 'admin_email', 'dev@raumboard.local')
+  board.setConfig(db, 'admin_hash', hashSecret('raumboard'))
+  board.setConfig(db, 'pin_hash', hashSecret('0000'))
+  console.log('DEV: Mandant "%s" bereit — Login dev@raumboard.local / raumboard, PIN 0000', DEFAULT_TENANT)
+}
 
 const ADMIN_TTL = 30 * 24 * 3600
 const BOARD_TTL = 180 * 24 * 3600
