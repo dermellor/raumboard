@@ -1,4 +1,7 @@
-import { Ban, CircleCheck, Hash, KeyRound, LogOut, Plus, RotateCcw, School, Settings, Sprout, Trash2 } from 'lucide-react'
+import {
+  Ban, Baby, CircleCheck, Database, Hash, KeyRound, LayoutGrid, LogOut, Plus,
+  RotateCcw, School, Settings, Sprout, Trash2, Users,
+} from 'lucide-react'
 import { useState } from 'react'
 import {
   addKid, addKlass, addRoom, changePassword, changePin, logout, occupancy,
@@ -10,6 +13,15 @@ import { useBoard, useMeta } from '../useBoard'
 import { Login } from './Login'
 
 type AdminModal = 'room' | 'klass' | 'kid' | null
+
+const TABS = [
+  { key: 'raeume', label: 'Räume', icon: <LayoutGrid /> },
+  { key: 'klassen', label: 'Klassen', icon: <Users /> },
+  { key: 'kinder', label: 'Kinder', icon: <Baby /> },
+  { key: 'daten', label: 'Daten', icon: <Database /> },
+  { key: 'zugang', label: 'Zugangsdaten', icon: <KeyRound /> },
+] as const
+type TabKey = (typeof TABS)[number]['key']
 
 function CredentialsSection() {
   const [modal, setModal] = useState<'password' | 'pin' | null>(null)
@@ -48,7 +60,6 @@ function CredentialsSection() {
 
   return (
     <section>
-      <h2>Zugangsdaten</h2>
       <button onClick={() => { setNotice(null); setModal('password') }}>
         <KeyRound /> Passwort ändern
       </button>{' '}
@@ -117,6 +128,7 @@ export function Admin() {
   const state = useBoard()
   const meta = useMeta()
   const [modal, setModal] = useState<AdminModal>(null)
+  const [tab, setTab] = useState<TabKey>('raeume')
   const [roomName, setRoomName] = useState('')
   const [roomEmoji, setRoomEmoji] = useState('🚪')
   const [roomCapacity, setRoomCapacity] = useState(4)
@@ -145,8 +157,20 @@ export function Admin() {
         )}
       </div>
 
+      <nav className="tabbar">
+        {TABS.filter((t) => t.key !== 'zugang' || meta.mode === 'api').map((t) => (
+          <button
+            key={t.key}
+            className={tab === t.key ? 'active' : undefined}
+            onClick={() => setTab(t.key)}
+          >
+            {t.icon} {t.label}
+          </button>
+        ))}
+      </nav>
+
+      {tab === 'daten' && (
       <section>
-        <h2>Tagesaktionen</h2>
         <button
           className="danger"
           onClick={() => {
@@ -166,11 +190,12 @@ export function Admin() {
           </button>
         )}
       </section>
+      )}
 
-      {meta.mode === 'api' && <CredentialsSection />}
+      {tab === 'zugang' && meta.mode === 'api' && <CredentialsSection />}
 
+      {tab === 'raeume' && (
       <section>
-        <h2>Räume</h2>
         <table>
           <thead>
             <tr>
@@ -234,9 +259,10 @@ export function Admin() {
           </tbody>
         </table>
       </section>
+      )}
 
+      {tab === 'klassen' && (
       <section>
-        <h2>Klassen</h2>
         <table>
           <thead>
             <tr>
@@ -277,9 +303,10 @@ export function Admin() {
           </tbody>
         </table>
       </section>
+      )}
 
+      {tab === 'kinder' && (
       <section>
-        <h2>Kinder</h2>
         {state.klasses.map((c) => (
           <details key={c.id}>
             <summary>Klasse {c.name}</summary>
@@ -342,6 +369,7 @@ export function Admin() {
           </details>
         ))}
       </section>
+      )}
 
       {modal === 'room' && (
         <Modal title="Raum hinzufügen" onClose={() => setModal(null)}>
