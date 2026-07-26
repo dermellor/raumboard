@@ -27,23 +27,24 @@ export function PinGate({ onClose }: { onClose: () => void }) {
         Dieses Gerät ist noch gesperrt. Eine Lehrkraft gibt einmalig die PIN ein, danach kann hier
         gebucht werden.
       </p>
-      <div className="field">
-        <label htmlFor="pin-input">PIN</label>
-        <input
-          id="pin-input"
-          type="password"
-          inputMode="numeric"
-          autoComplete="one-time-code"
-          value={pin}
-          autoFocus
-          onChange={(e) => setPin(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && pin.trim()) void submit()
-          }}
-        />
-      </div>
-      {error && <p className="form-error">{error}</p>}
-      <button disabled={!pin.trim() || busy} onClick={() => void submit()}>
+      <input
+        id="pin-input"
+        className="pin-input"
+        type="password"
+        inputMode="numeric"
+        pattern="[0-9]*"
+        autoComplete="one-time-code"
+        maxLength={8}
+        aria-label="PIN"
+        value={pin}
+        autoFocus
+        onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && pin.trim()) void submit()
+        }}
+      />
+      {error && <p className="form-error pin-error">{error}</p>}
+      <button className="pin-submit" disabled={!pin.trim() || busy} onClick={() => void submit()}>
         <KeyRound /> Entsperren
       </button>
     </Modal>
