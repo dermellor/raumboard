@@ -1,4 +1,6 @@
+import { Lock } from 'lucide-react'
 import { useRoute } from './router'
+import { lockDevice } from './store'
 import { useMeta } from './useBoard'
 import { Admin } from './views/Admin'
 import { Home } from './views/Home'
@@ -15,14 +17,35 @@ export function App() {
         <p>Lädt …</p>
       </main>
     )
+
+  let view
   switch (route.view) {
     case 'klasse':
-      return <KlassenBoard klassId={route.id} />
+      view = <KlassenBoard klassId={route.id} />
+      break
     case 'raum':
-      return <RaumSicht roomId={route.id} />
+      view = <RaumSicht roomId={route.id} />
+      break
     case 'admin':
-      return <Admin />
+      view = <Admin />
+      break
     default:
-      return <Home />
+      view = <Home />
   }
+
+  return (
+    <>
+      {view}
+      {/* local dev only: clear the session so the PIN gate can be tested */}
+      {meta.dev && meta.canBook && (
+        <button
+          className="dev-lock"
+          title="Nur lokal: Admin-Session und Geräte-PIN zurücksetzen, um die PIN-Eingabe zu testen"
+          onClick={() => void lockDevice()}
+        >
+          <Lock /> Gerät sperren (Dev)
+        </button>
+      )}
+    </>
+  )
 }

@@ -8,6 +8,8 @@ export type StoreMeta = {
   /** booking mutations allowed (teacher PIN entered or admin) */
   canBook: boolean
   isAdmin: boolean
+  /** server runs in local dev mode (RAUMBOARD_DEV) — enables test-only affordances */
+  dev: boolean
 }
 
 export type AuthResult = { ok: true } | { ok: false; reason: string }
@@ -42,6 +44,8 @@ export type BoardStore = {
   login(email: string, password: string): Promise<AuthResult>
   logout(): Promise<void>
   enterPin(pin: string): Promise<AuthResult>
+  /** dev/test only: clear admin + board unlock so the PIN gate reappears */
+  lockDevice(): Promise<void>
   /** re-verify with the current password (api mode; demo has nothing to change) */
   changePassword(current: string, next: string): Promise<AuthResult>
   changePin(password: string, pin: string): Promise<AuthResult>

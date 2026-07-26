@@ -40,4 +40,5 @@ export const {
   enterPin,
   changePassword,
   changePin,
+  lockDevice,
 } = store

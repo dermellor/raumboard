@@ -92,6 +92,7 @@ api.get('/state', (c) => {
       schoolName: board.getConfig(db, 'school_name') ?? slug,
       isAdmin,
       canBook,
+      dev: DEV,
     },
   })
 })

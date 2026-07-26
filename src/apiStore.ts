@@ -7,7 +7,7 @@ import type { BoardState, BookResult } from './types'
 // corrects any race. Admin CRUD relies on the broadcast round-trip.
 
 let state: BoardState = { klasses: [], kids: [], rooms: [] }
-let meta: StoreMeta = { mode: 'api', ready: false, canBook: false, isAdmin: false }
+let meta: StoreMeta = { mode: 'api', ready: false, canBook: false, isAdmin: false, dev: false }
 const listeners = new Set<() => void>()
 
 function notify() {
@@ -202,5 +202,11 @@ export const apiStore: BoardStore = {
     if (res.ok) return { ok: true }
     const data = await res.json().catch(() => ({}))
     return { ok: false, reason: data.error ?? 'Ändern fehlgeschlagen' }
+  },
+
+  async lockDevice() {
+    await post('/api/logout')
+    setMeta({ isAdmin: false, canBook: false })
+    await refetch()
   },
 }
