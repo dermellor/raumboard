@@ -1,8 +1,8 @@
-import { Ban, CircleCheck, LogOut, Plus, RotateCcw, School, Settings, Sprout, Trash2 } from 'lucide-react'
+import { Ban, CircleCheck, Hash, KeyRound, LogOut, Plus, RotateCcw, School, Settings, Sprout, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import {
-  addKid, addKlass, addRoom, logout, occupancy, removeKid, removeKlass, removeRoom,
-  reseed, reset, updateKid, updateKlass, updateRoom,
+  addKid, addKlass, addRoom, changePassword, changePin, logout, occupancy,
+  removeKid, removeKlass, removeRoom, reseed, reset, updateKid, updateKlass, updateRoom,
 } from '../store'
 import { EmojiButton } from '../EmojiButton'
 import { Modal } from '../components'
@@ -10,6 +10,108 @@ import { useBoard, useMeta } from '../useBoard'
 import { Login } from './Login'
 
 type AdminModal = 'room' | 'klass' | 'kid' | null
+
+function CredentialsSection() {
+  const [modal, setModal] = useState<'password' | 'pin' | null>(null)
+  const [current, setCurrent] = useState('')
+  const [next, setNext] = useState('')
+  const [repeat, setRepeat] = useState('')
+  const [pin, setPin] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+
+  const close = () => {
+    setModal(null)
+    setCurrent('')
+    setNext('')
+    setRepeat('')
+    setPin('')
+    setError(null)
+  }
+
+  const submitPassword = async () => {
+    if (next.length < 10) return setError('Neues Passwort braucht mindestens 10 Zeichen.')
+    if (next !== repeat) return setError('Die Wiederholung stimmt nicht überein.')
+    const result = await changePassword(current, next)
+    if (!result.ok) return setError(result.reason)
+    close()
+    setNotice('Passwort geändert.')
+  }
+
+  const submitPin = async () => {
+    if (!/^\d{4,8}$/.test(pin.trim())) return setError('Die PIN muss aus 4–8 Ziffern bestehen.')
+    const result = await changePin(current, pin.trim())
+    if (!result.ok) return setError(result.reason)
+    close()
+    setNotice('Lehrkraft-PIN geändert. Bereits entsperrte Geräte bleiben entsperrt.')
+  }
+
+  return (
+    <section>
+      <h2>Zugangsdaten</h2>
+      <button onClick={() => { setNotice(null); setModal('password') }}>
+        <KeyRound /> Passwort ändern
+      </button>{' '}
+      <button onClick={() => { setNotice(null); setModal('pin') }}>
+        <Hash /> Lehrkraft-PIN ändern
+      </button>
+      {notice && <p className="count">{notice}</p>}
+
+      {modal === 'password' && (
+        <Modal title="Passwort ändern" onClose={close}>
+          <div className="field">
+            <label htmlFor="cred-current">Aktuelles Passwort</label>
+            <input
+              id="cred-current" type="password" autoFocus autoComplete="current-password"
+              value={current} onChange={(e) => setCurrent(e.target.value)}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="cred-next">Neues Passwort</label>
+            <input
+              id="cred-next" type="password" autoComplete="new-password"
+              value={next} onChange={(e) => setNext(e.target.value)}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="cred-repeat">Wiederholen</label>
+            <input
+              id="cred-repeat" type="password" autoComplete="new-password"
+              value={repeat} onChange={(e) => setRepeat(e.target.value)}
+            />
+          </div>
+          {error && <p className="form-error">{error}</p>}
+          <button disabled={!current || !next || !repeat} onClick={() => void submitPassword()}>
+            speichern
+          </button>
+        </Modal>
+      )}
+
+      {modal === 'pin' && (
+        <Modal title="Lehrkraft-PIN ändern" onClose={close}>
+          <div className="field">
+            <label htmlFor="cred-pw">Admin-Passwort</label>
+            <input
+              id="cred-pw" type="password" autoFocus autoComplete="current-password"
+              value={current} onChange={(e) => setCurrent(e.target.value)}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="cred-pin">Neue PIN</label>
+            <input
+              id="cred-pin" inputMode="numeric" pattern="[0-9]*" placeholder="4–8 Ziffern"
+              value={pin} onChange={(e) => setPin(e.target.value)}
+            />
+          </div>
+          {error && <p className="form-error">{error}</p>}
+          <button disabled={!current || !pin} onClick={() => void submitPin()}>
+            speichern
+          </button>
+        </Modal>
+      )}
+    </section>
+  )
+}
 
 export function Admin() {
   const state = useBoard()
@@ -64,6 +166,8 @@ export function Admin() {
           </button>
         )}
       </section>
+
+      {meta.mode === 'api' && <CredentialsSection />}
 
       <section>
         <h2>Räume</h2>

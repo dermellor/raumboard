@@ -167,4 +167,10 @@ export const demoStore: BoardStore = {
   async enterPin() {
     return { ok: true as const }
   },
+  async changePassword() {
+    return { ok: false as const, reason: 'Im Demo-Modus nicht verfügbar' }
+  },
+  async changePin() {
+    return { ok: false as const, reason: 'Im Demo-Modus nicht verfügbar' }
+  },
 }

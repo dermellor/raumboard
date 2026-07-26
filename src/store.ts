@@ -38,4 +38,6 @@ export const {
   login,
   logout,
   enterPin,
+  changePassword,
+  changePin,
 } = store

@@ -42,4 +42,7 @@ export type BoardStore = {
   login(email: string, password: string): Promise<AuthResult>
   logout(): Promise<void>
   enterPin(pin: string): Promise<AuthResult>
+  /** re-verify with the current password (api mode; demo has nothing to change) */
+  changePassword(current: string, next: string): Promise<AuthResult>
+  changePin(password: string, pin: string): Promise<AuthResult>
 }

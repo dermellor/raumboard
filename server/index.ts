@@ -7,7 +7,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { WebSocketServer } from 'ws'
 import * as board from './board'
-import { makeToken, verifySecret, verifyToken } from './auth'
+import { hashSecret, makeToken, verifySecret, verifyToken } from './auth'
 import { BASE_DOMAIN, openTenant, slugFromHost, tenantExists } from './tenant'
 import { broadcast, register } from './ws'
 
@@ -207,6 +207,31 @@ api.patch('/admin/klasses/:id', async (c) => {
 api.delete('/admin/klasses/:id', (c) => {
   board.removeKlass(openTenant(c.get('slug')), c.req.param('id'))
   broadcast(c.get('slug'), stateMessage(c.get('slug')))
+  return c.json({ ok: true })
+})
+
+/** Credentials self-service — both re-verify the current admin password. */
+api.post('/admin/change-password', async (c) => {
+  const db = openTenant(c.get('slug'))
+  const { current, next } = await c.req.json<{ current?: string; next?: string }>()
+  const storedHash = board.getConfig(db, 'admin_hash')
+  if (!current || !storedHash || !verifySecret(current, storedHash))
+    return c.json({ error: 'Aktuelles Passwort falsch' }, 401)
+  if (!next || next.length < 10)
+    return c.json({ error: 'Neues Passwort braucht mindestens 10 Zeichen' }, 400)
+  board.setConfig(db, 'admin_hash', hashSecret(next))
+  return c.json({ ok: true })
+})
+
+api.post('/admin/change-pin', async (c) => {
+  const db = openTenant(c.get('slug'))
+  const { password, pin } = await c.req.json<{ password?: string; pin?: string }>()
+  const storedHash = board.getConfig(db, 'admin_hash')
+  if (!password || !storedHash || !verifySecret(password, storedHash))
+    return c.json({ error: 'Passwort falsch' }, 401)
+  if (!pin || !/^\d{4,8}$/.test(pin.trim()))
+    return c.json({ error: 'PIN muss aus 4–8 Ziffern bestehen' }, 400)
+  board.setConfig(db, 'pin_hash', hashSecret(pin.trim()))
   return c.json({ ok: true })
 })
 

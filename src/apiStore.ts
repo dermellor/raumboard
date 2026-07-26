@@ -189,4 +189,18 @@ export const apiStore: BoardStore = {
     const data = await res.json().catch(() => ({}))
     return { ok: false, reason: data.error ?? 'PIN falsch' }
   },
+
+  async changePassword(current, next): Promise<AuthResult> {
+    const res = await post('/api/admin/change-password', { current, next })
+    if (res.ok) return { ok: true }
+    const data = await res.json().catch(() => ({}))
+    return { ok: false, reason: data.error ?? 'Ändern fehlgeschlagen' }
+  },
+
+  async changePin(password, pin): Promise<AuthResult> {
+    const res = await post('/api/admin/change-pin', { password, pin })
+    if (res.ok) return { ok: true }
+    const data = await res.json().catch(() => ({}))
+    return { ok: false, reason: data.error ?? 'Ändern fehlgeschlagen' }
+  },
 }
