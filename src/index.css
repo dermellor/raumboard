@@ -430,6 +430,112 @@ h1 {
   color: var(--bg);
 }
 
+/* --- import wizard ------------------------------------------------------------- */
+
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 2rem 1rem;
+  margin: 1rem 0;
+  border: 3px dashed var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  cursor: pointer;
+  text-align: center;
+  color: var(--ink-soft);
+}
+
+.dropzone:hover {
+  border-color: var(--ink-soft);
+}
+
+.dropzone svg {
+  width: 2rem;
+  height: 2rem;
+}
+
+.import-config h3 {
+  margin: 1.25rem 0 0.5rem;
+}
+
+.map-table td {
+  padding: 0.25rem 0.5rem 0.25rem 0;
+  vertical-align: middle;
+}
+
+.map-table td:first-child {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.map-table select,
+.import-config select,
+.import-config input {
+  min-height: 2.6rem;
+  padding: 0.3rem 0.5rem;
+  border-radius: 0.6rem;
+  border: 2px solid var(--line);
+  background: var(--card);
+  font: inherit;
+}
+
+.radio {
+  min-width: 0 !important;
+  font-weight: 400 !important;
+}
+
+.preview-scroll {
+  max-height: 16rem;
+  overflow-y: auto;
+  border: 2px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.preview-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.preview-table td {
+  padding: 0.3rem 0.6rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.preview-table tr.bad td {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.pv-emoji {
+  font-size: 1.4rem;
+  width: 2.5rem;
+  text-align: center;
+}
+
+.pv-klass {
+  color: var(--ink-soft);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.import-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.import-actions .pin-submit {
+  flex: 1;
+}
+
+.section-rule {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 1rem 0;
+}
+
 /* --- add button in table header ------------------------------------------------ */
 
 .admin th.th-add,
@@ -456,6 +562,10 @@ h1 {
 
 .modal {
   width: min(28rem, 100%);
+}
+
+.modal-wide {
+  width: min(44rem, 100%);
 }
 
 .field {
@@ -498,6 +608,49 @@ h1 {
 
 .pin-error {
   text-align: center;
+}
+
+/* segmented PIN: one box per digit, so the number of digits is visible */
+.pin-slots {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  gap: 0.6rem;
+  margin: 1.25rem 0 0.5rem;
+  cursor: text;
+}
+
+.pin-slot {
+  width: 3.25rem;
+  height: 4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.pin-slot.active {
+  border-color: var(--accent, var(--ink));
+}
+
+.pin-dot {
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 50%;
+  background: var(--ink);
+}
+
+/* the real input sits invisibly over the slots to capture typing + keypad */
+.pin-hidden {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  border: 0;
+  cursor: text;
 }
 
 .pin-submit {

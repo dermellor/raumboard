@@ -170,6 +170,61 @@ export function removeKid(db: Database.Database, kidId: string): void {
   db.prepare('DELETE FROM kids WHERE id = ?').run(kidId)
 }
 
+export type ImportEntry = { name: string; symbol: string; klass: string | null }
+
+/**
+ * Batch-import kids from a parsed spreadsheet. Effective class per row is
+ * `entry.klass` (a per-row class column) or the wizard's `targetKlass`.
+ * Missing classes are created. In `replace` mode every receiving class is
+ * emptied first (school-year start); `append` keeps existing kids.
+ */
+export function importKids(
+  db: Database.Database,
+  entries: ImportEntry[],
+  targetKlass: string | null,
+  mode: 'append' | 'replace',
+): { added: number; klassesCreated: string[] } {
+  return db.transaction(() => {
+    const klassesCreated: string[] = []
+    const idByName = new Map<string, string>()
+    for (const row of db.prepare('SELECT id, name FROM klasses').all() as { id: string; name: string }[])
+      idByName.set(row.name.toLowerCase(), row.id)
+
+    const resolveKlass = (name: string): string => {
+      const key = name.trim().toLowerCase()
+      const existing = idByName.get(key)
+      if (existing) return existing
+      const id = slugId(db, name.trim())
+      db.prepare('INSERT INTO klasses (id, name, emoji) VALUES (?, ?, NULL)').run(id, name.trim())
+      idByName.set(key, id)
+      klassesCreated.push(name.trim())
+      return id
+    }
+
+    const prepared = entries
+      .map((e) => ({ ...e, klassName: (e.klass || targetKlass || '').trim() }))
+      .filter((e) => e.name.trim() && e.klassName)
+
+    if (mode === 'replace') {
+      const targetIds = new Set(prepared.map((e) => resolveKlass(e.klassName)))
+      for (const id of targetIds) db.prepare('DELETE FROM kids WHERE klass_id = ?').run(id)
+    }
+
+    let added = 0
+    for (const e of prepared) {
+      const klassId = resolveKlass(e.klassName)
+      db.prepare('INSERT INTO kids (id, klass_id, symbol, name) VALUES (?, ?, ?, ?)').run(
+        slugId(db, `${klassId}-${e.name.trim()}`),
+        klassId,
+        e.symbol || '⭐',
+        e.name.trim(),
+      )
+      added++
+    }
+    return { added, klassesCreated }
+  })()
+}
+
 export function addKlass(db: Database.Database, name: string, emoji?: string): void {
   db.prepare('INSERT INTO klasses (id, name, emoji) VALUES (?, ?, ?)').run(
     slugId(db, name),

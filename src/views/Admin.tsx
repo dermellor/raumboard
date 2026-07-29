@@ -1,8 +1,8 @@
 import {
   Ban, Baby, CircleCheck, Database, Hash, KeyRound, LayoutGrid, LogOut, Plus,
-  RotateCcw, School, Settings, Sprout, Trash2, Users,
+  RotateCcw, School, Settings, Sprout, Trash2, Upload, Users,
 } from 'lucide-react'
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import {
   addKid, addKlass, addRoom, changePassword, changePin, logout, occupancy,
   removeKid, removeKlass, removeRoom, reseed, reset, updateKid, updateKlass, updateRoom,
@@ -10,6 +10,12 @@ import {
 import { EmojiButton } from '../EmojiButton'
 import { Modal } from '../components'
 import { useBoard, useMeta } from '../useBoard'
+
+// SheetJS is heavy and only needed for the (rare) admin import — load it on demand
+// so the boards running all day on whiteboards stay light.
+const ImportWizard = lazy(() =>
+  import('../import/ImportWizard').then((m) => ({ default: m.ImportWizard })),
+)
 import { Login } from './Login'
 
 type AdminModal = 'room' | 'klass' | 'kid' | null
@@ -129,6 +135,7 @@ export function Admin() {
   const meta = useMeta()
   const [modal, setModal] = useState<AdminModal>(null)
   const [tab, setTab] = useState<TabKey>('raeume')
+  const [importOpen, setImportOpen] = useState(false)
   const [roomName, setRoomName] = useState('')
   const [roomEmoji, setRoomEmoji] = useState('🚪')
   const [roomCapacity, setRoomCapacity] = useState(4)
@@ -171,6 +178,10 @@ export function Admin() {
 
       {tab === 'daten' && (
       <section>
+        <button onClick={() => setImportOpen(true)}>
+          <Upload /> Kinder aus Excel/CSV importieren
+        </button>
+        <hr className="section-rule" />
         <button
           className="danger"
           onClick={() => {
@@ -188,6 +199,22 @@ export function Admin() {
           >
             <Sprout /> Beispieldaten neu laden
           </button>
+        )}
+        {meta.dev && (
+          <button
+            className="danger"
+            title="Nur lokal: aktuelle Daten verwerfen und den Beispiel-Datensatz laden"
+            onClick={() => {
+              if (confirm('Bestehende Daten wirklich durch Beispieldaten ersetzen?')) reseed()
+            }}
+          >
+            <Sprout /> Bestehende Daten durch Beispieldaten ersetzen (Dev)
+          </button>
+        )}
+        {importOpen && (
+          <Suspense fallback={null}>
+            <ImportWizard onClose={() => setImportOpen(false)} />
+          </Suspense>
         )}
       </section>
       )}

@@ -33,6 +33,7 @@ if (DEV && DEFAULT_TENANT) {
   board.setConfig(db, 'admin_email', 'dev@raumboard.local')
   board.setConfig(db, 'admin_hash', hashSecret('raumboard'))
   board.setConfig(db, 'pin_hash', hashSecret('0000'))
+  board.setConfig(db, 'pin_length', '4')
   console.log('DEV: Mandant "%s" bereit — Login dev@raumboard.local / raumboard, PIN 0000', DEFAULT_TENANT)
 }
 
@@ -93,6 +94,9 @@ api.get('/state', (c) => {
       isAdmin,
       canBook,
       dev: DEV,
+      // digit count of the teacher PIN, so the gate can show the right number of
+      // slots. Only the length (not the PIN) — harmless for an anti-mischief PIN.
+      pinLength: Number(board.getConfig(db, 'pin_length')) || null,
     },
   })
 })
@@ -169,6 +173,33 @@ api.post('/reset', (c) => {
 api.use('/admin/*', async (c, next) => {
   if (!authInfo(c, c.get('slug')).isAdmin) return c.json({ error: 'admin required' }, 401)
   await next()
+})
+
+/** Dev-only: wipe tenant data and reload the demo seed. Guarded by DEV so real
+ * children's data in production can never be destroyed via the API. */
+api.post('/admin/reseed', (c) => {
+  if (!DEV) return c.json({ error: 'nur im Entwicklungsmodus' }, 403)
+  const slug = c.get('slug')
+  board.replaceAll(openTenant(slug), buildSeed())
+  broadcast(slug, stateMessage(slug))
+  return c.json({ ok: true })
+})
+
+api.post('/admin/import', async (c) => {
+  const slug = c.get('slug')
+  const body = await c.req.json<{
+    mode?: 'append' | 'replace'
+    targetKlass?: string | null
+    kids?: { name?: string; symbol?: string; klass?: string | null }[]
+  }>()
+  const kids = (body.kids ?? [])
+    .map((k) => ({ name: (k.name ?? '').trim(), symbol: (k.symbol ?? '').trim(), klass: k.klass ?? null }))
+    .filter((k) => k.name)
+  if (kids.length === 0) return c.json({ error: 'keine Kinder in der Datei' }, 400)
+  const mode = body.mode === 'replace' ? 'replace' : 'append'
+  const result = board.importKids(openTenant(slug), kids, body.targetKlass ?? null, mode)
+  broadcast(slug, stateMessage(slug))
+  return c.json({ ok: true, ...result })
 })
 
 api.post('/admin/rooms', async (c) => {
@@ -253,6 +284,7 @@ api.post('/admin/change-pin', async (c) => {
   if (!pin || !/^\d{4,8}$/.test(pin.trim()))
     return c.json({ error: 'PIN muss aus 4–8 Ziffern bestehen' }, 400)
   board.setConfig(db, 'pin_hash', hashSecret(pin.trim()))
+  board.setConfig(db, 'pin_length', String(pin.trim().length))
   return c.json({ ok: true })
 })
 

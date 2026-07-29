@@ -17,14 +17,16 @@ export function Modal({
   title,
   onClose,
   children,
+  wide,
 }: {
   title: string
   onClose: () => void
   children: ReactNode
+  wide?: boolean
 }) {
   return (
     <div className="overlay" onClick={onClose}>
-      <div className="picker modal" onClick={(e) => e.stopPropagation()}>
+      <div className={`picker modal${wide ? ' modal-wide' : ''}`} onClick={(e) => e.stopPropagation()}>
         <button className="close" onClick={onClose} aria-label="Schließen">
           <X />
         </button>

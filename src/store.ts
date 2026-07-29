@@ -35,6 +35,7 @@ export const {
   addKlass,
   updateKlass,
   removeKlass,
+  importKids,
   login,
   logout,
   enterPin,

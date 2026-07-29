@@ -10,9 +10,16 @@ export type StoreMeta = {
   isAdmin: boolean
   /** server runs in local dev mode (RAUMBOARD_DEV) — enables test-only affordances */
   dev: boolean
+  /** digit count of the teacher PIN (api mode), for the segmented gate display */
+  pinLength?: number | null
 }
 
 export type AuthResult = { ok: true } | { ok: false; reason: string }
+
+export type ImportEntry = { name: string; symbol: string; klass: string | null }
+export type ImportResult =
+  | { ok: true; added: number; klassesCreated: string[] }
+  | { ok: false; reason: string }
 
 /**
  * Contract shared by demoStore (localStorage) and apiStore (server).
@@ -40,6 +47,12 @@ export type BoardStore = {
   addKlass(name: string, emoji?: string): void
   updateKlass(klassId: string, patch: Partial<Pick<Klass, 'name' | 'emoji'>>): void
   removeKlass(klassId: string): void
+
+  importKids(
+    entries: ImportEntry[],
+    targetKlass: string | null,
+    mode: 'append' | 'replace',
+  ): Promise<ImportResult>
 
   login(email: string, password: string): Promise<AuthResult>
   logout(): Promise<void>

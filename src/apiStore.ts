@@ -1,5 +1,5 @@
 import { canBook } from './boardLogic'
-import type { AuthResult, BoardStore, StoreMeta } from './storeTypes'
+import type { AuthResult, BoardStore, ImportResult, StoreMeta } from './storeTypes'
 import type { BoardState, BookResult } from './types'
 
 // Server-backed store: REST mutations + WebSocket push. Booking mutations are
@@ -133,7 +133,8 @@ export const apiStore: BoardStore = {
   },
 
   reseed() {
-    // not available against the server
+    // dev-only on the server (guarded there); no-op if forbidden
+    mutate('/api/admin/reseed')
   },
 
   addRoom(name, emoji, capacity, scope) {
@@ -162,6 +163,17 @@ export const apiStore: BoardStore = {
   },
   removeKlass(klassId) {
     void request('DELETE', `/api/admin/klasses/${encodeURIComponent(klassId)}`)
+  },
+
+  async importKids(entries, targetKlass, mode): Promise<ImportResult> {
+    const res = await post('/api/admin/import', { kids: entries, targetKlass, mode })
+    if (res.ok) {
+      const data = await res.json().catch(() => ({}))
+      await refetch()
+      return { ok: true, added: data.added ?? entries.length, klassesCreated: data.klassesCreated ?? [] }
+    }
+    const data = await res.json().catch(() => ({}))
+    return { ok: false, reason: data.error ?? 'Import fehlgeschlagen' }
   },
 
   async login(email, password): Promise<AuthResult> {

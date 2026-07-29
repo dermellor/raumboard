@@ -1,6 +1,6 @@
 import { canBook } from './boardLogic'
 import { buildSeed } from './seed'
-import type { BoardStore, StoreMeta } from './storeTypes'
+import type { BoardStore, ImportResult, StoreMeta } from './storeTypes'
 import type { BoardState, BookResult, Kid, Klass, Room } from './types'
 
 // Demo/offline store: localStorage persistence + cross-tab sync via the
@@ -157,6 +157,47 @@ export const demoStore: BoardStore = {
       kids: state.kids.filter((k) => k.klassId !== klassId),
       rooms: state.rooms.filter((r) => r.scope !== klassId),
     })
+  },
+
+  async importKids(entries, targetKlass, mode): Promise<ImportResult> {
+    const klasses: Klass[] = [...state.klasses]
+    let kids: Kid[] = [...state.kids]
+    const klassesCreated: string[] = []
+    const idByName = new Map(klasses.map((c) => [c.name.toLowerCase(), c.id]))
+
+    const resolveKlass = (name: string): string => {
+      const key = name.trim().toLowerCase()
+      const existing = idByName.get(key)
+      if (existing) return existing
+      const id = slug(name.trim())
+      klasses.push({ id, name: name.trim() })
+      idByName.set(key, id)
+      klassesCreated.push(name.trim())
+      return id
+    }
+
+    const prepared = entries
+      .map((e) => ({ ...e, klassName: (e.klass || targetKlass || '').trim() }))
+      .filter((e) => e.name.trim() && e.klassName)
+
+    if (mode === 'replace') {
+      const targetIds = new Set(prepared.map((e) => resolveKlass(e.klassName)))
+      kids = kids.filter((k) => !targetIds.has(k.klassId))
+    }
+
+    let added = 0
+    for (const e of prepared) {
+      const klassId = resolveKlass(e.klassName)
+      const taken = new Set([...state.rooms, ...kids, ...klasses].map((x) => x.id))
+      let id = slug(`${klassId}-${e.name.trim()}`)
+      let n = 2
+      while (taken.has(id)) id = `${slug(`${klassId}-${e.name.trim()}`)}-${n++}`
+      kids.push({ id, klassId, symbol: e.symbol || '⭐', name: e.name.trim(), currentRoomId: null })
+      added++
+    }
+
+    commit({ ...state, klasses, kids })
+    return { ok: true, added, klassesCreated }
   },
 
   // auth is a no-op in demo mode — everything is unlocked
