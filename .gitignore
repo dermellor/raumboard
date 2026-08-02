@@ -28,3 +28,7 @@ server.test.log
 # AVV: Privatadresse + generierte PDFs bleiben lokal
 docs/.avv-anschrift.txt
 docs/*.pdf
+
+# Maintainer-only Betriebs-/Kontext-Notizen (nicht ins Public-Repo)
+DEPLOY.local.md
+*.local.md
