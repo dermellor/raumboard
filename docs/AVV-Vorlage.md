@@ -7,9 +7,11 @@
 > (u. a. VO-DV I); die Schule nimmt die Verarbeitung in ihr Verzeichnis von
 > Verarbeitungstätigkeiten auf.
 >
-> Auszufüllen bleiben nur die üblichen Vertragsfelder: die Angaben der Schule
-> (`[…]`) und die Unterschriften. Die Anschrift des Auftragnehmers ist an einer
-> Stelle mit «ANSCHRIFT_AUFTRAGNEHMER» markiert.
+> Auszufüllen bleiben die üblichen Vertragsfelder: die Angaben der Schule (`[…]`),
+> die Angaben des Auftragnehmers (die mit «…» markierten Platzhalter — Name,
+> Anschrift, Kontakt) und die Unterschriften. Die Liste der Unterauftragnehmer
+> (Ziff. 6) beschreibt beispielhaft ein gehostetes Setup und ist an die tatsächlich
+> eingesetzten Dienstleister anzupassen.
 
 ## Vertrag über die Verarbeitung personenbezogener Daten im Auftrag
 
@@ -20,7 +22,7 @@ der **[Name der Schule]**, [Anschrift], vertreten durch die Schulleitung
 
 **und**
 
-**Marcel Mellor**, «ANSCHRIFT_AUFTRAGNEHMER», nachfolgend **Auftragnehmer**
+**«AUFTRAGNEHMER_NAME»**, «AUFTRAGNEHMER_ANSCHRIFT», nachfolgend **Auftragnehmer**
 (Betreiber von „Raumboard"),
 
 nachfolgend gemeinsam „Parteien".
@@ -79,10 +81,12 @@ das Schutzniveau darf dabei nicht unterschritten werden.
 
 (1) Der Verantwortliche stimmt dem Einsatz folgender Unterauftragsverarbeiter zu:
 
+*Beispielhaftes gehostetes Setup — durch die tatsächlich eingesetzten Dienstleister ersetzen:*
+
 | Unterauftragnehmer | Leistung | Ort der Verarbeitung |
 | --- | --- | --- |
-| Hetzner Online GmbH | Server-Hosting (virtueller Server) | Deutschland (Rechenzentrum Falkenstein) |
-| BunnyWay d.o.o. (bunny.net) | verschlüsselte Backup-Ablage | EU-Region |
+| «Server-Hoster, z. B. Hetzner Online GmbH» | Server-Hosting (virtueller Server) | «z. B. Deutschland» |
+| «Backup-Speicher, z. B. BunnyWay d.o.o.» | verschlüsselte Backup-Ablage | «z. B. EU-Region» |
 
 (2) Weitere Unterauftragnehmer setzt der Auftragnehmer nur nach vorheriger
 Information ein; der Verantwortliche kann binnen 14 Tagen aus wichtigem
@@ -97,7 +101,7 @@ Der Auftragnehmer unterstützt den Verantwortlichen im erforderlichen Umfang bei
 Betroffenenrechten (Art. 15–22), bei Meldepflichten (Art. 33/34) sowie bei
 Datenschutz-Folgenabschätzungen (Art. 35/36) und meldet ihm Datenschutzverletzungen
 unverzüglich, spätestens innerhalb von 24 Stunden nach Kenntnis. Ansprechpartner
-des Auftragnehmers: Marcel Mellor, mail@marcelmellor.com.
+des Auftragnehmers: «AUFTRAGNEHMER_NAME», «AUFTRAGNEHMER_KONTAKT».
 
 ### 8. Vertraulichkeit
 

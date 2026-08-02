@@ -1,24 +1,37 @@
 #!/bin/bash
 # Nightly backup: consistent SQLite copies of every tenant DB, encrypted at rest
-# (AES-256), uploaded to Bunny Storage (zone raumboard-backups), 14 daily
-# generations retained. Reads BUNNY_BACKUP_PASSWORD and BUNNY_BACKUP_ENC_KEY
-# from /opt/raumboard/.env.
+# (AES-256) before they leave the server, uploaded to object storage. Old daily
+# generations are pruned by the storage retention policy.
+#
+# Configure via environment. The systemd unit has no EnvironmentFile, so this
+# script sources RAUMBOARD_ENV (the app's server-side .env) to pick up the vars:
+#   RAUMBOARD_ENV          env file to source        (default /opt/raumboard/.env)
+#   BACKUP_DATA            dir holding <slug>.db      (default /opt/raumboard/data)
+#   BACKUP_WORK            scratch dir                (default /opt/raumboard/backups)
+#   BACKUP_STORAGE_ZONE    object-storage zone/bucket (required)
+#   BACKUP_STORAGE_HOST    storage endpoint host      (default storage.bunnycdn.com)
+#   BACKUP_STORAGE_KEY     storage access key         (required — secret)
+#   BACKUP_ENC_KEY         AES-256 passphrase         (required — secret; no key, no upload)
 #
 # Restore:  openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 \
-#             -pass "pass:$BUNNY_BACKUP_ENC_KEY" -in <file>.db.gz.enc | gunzip > restored.db
+#             -pass "pass:$BACKUP_ENC_KEY" -in <file>.db.gz.enc | gunzip > restored.db
 set -euo pipefail
 
-source /opt/raumboard/.env
-DATA=/opt/raumboard/data
-WORK=/opt/raumboard/backups
+ENV_FILE="${RAUMBOARD_ENV:-/opt/raumboard/.env}"
+[ -f "$ENV_FILE" ] && source "$ENV_FILE"
+
+DATA="${BACKUP_DATA:-/opt/raumboard/data}"
+WORK="${BACKUP_WORK:-/opt/raumboard/backups}"
 STAMP=$(date +%F)
-ZONE=raumboard-backups
+ZONE="${BACKUP_STORAGE_ZONE:?set BACKUP_STORAGE_ZONE (object-storage zone/bucket)}"
+STORAGE_HOST="${BACKUP_STORAGE_HOST:-storage.bunnycdn.com}"
 
 # Never upload unencrypted school data: without a key, stop.
-if [ -z "${BUNNY_BACKUP_ENC_KEY:-}" ]; then
-  echo "FEHLER: BUNNY_BACKUP_ENC_KEY fehlt in /opt/raumboard/.env — Abbruch (kein Klartext-Upload)." >&2
+if [ -z "${BACKUP_ENC_KEY:-}" ]; then
+  echo "FEHLER: BACKUP_ENC_KEY fehlt — Abbruch (kein Klartext-Upload)." >&2
   exit 1
 fi
+: "${BACKUP_STORAGE_KEY:?set BACKUP_STORAGE_KEY (storage access key)}"
 
 mkdir -p "$WORK"
 shopt -s nullglob
@@ -29,9 +42,9 @@ for db in "$DATA"/*.db; do
   gzip -f "$out"
   # encrypt at rest before it ever leaves the server
   openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt \
-    -pass "pass:$BUNNY_BACKUP_ENC_KEY" -in "$out.gz" -out "$out.gz.enc"
-  curl -sf -X PUT "https://storage.bunnycdn.com/$ZONE/$STAMP/${slug}.db.gz.enc" \
-    -H "AccessKey: $BUNNY_BACKUP_PASSWORD" \
+    -pass "pass:$BACKUP_ENC_KEY" -in "$out.gz" -out "$out.gz.enc"
+  curl -sf -X PUT "https://$STORAGE_HOST/$ZONE/$STAMP/${slug}.db.gz.enc" \
+    -H "AccessKey: $BACKUP_STORAGE_KEY" \
     --data-binary @"$out.gz.enc"
   rm -f "$out.gz" "$out.gz.enc"
   echo "backup ok (verschlüsselt): $slug ($STAMP)"

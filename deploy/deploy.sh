@@ -1,12 +1,25 @@
 #!/bin/bash
-# Deploy Raumboard to the Hetzner server (deploy-host). Builds the frontend
-# locally, syncs app files, installs prod deps, restarts the service.
-# Tenant data (/opt/raumboard/data) is never touched.
+# Deploy Raumboard to a server over SSH: build the frontend locally, rsync the
+# app files, install prod deps, restart the systemd service. Tenant data
+# (the server's data/ dir) is never touched.
+#
+# Configure via environment (or an untracked deploy/deploy.env that is sourced):
+#   DEPLOY_HOST     SSH host or alias of the target server      (required)
+#   DEPLOY_PATH     app directory on the server                 (default /opt/raumboard/app)
+#   DEPLOY_USER     service user for chown                      (default raumboard)
+#   DEPLOY_SERVICE  systemd service name                        (default raumboard)
+#   DEPLOY_DOMAIN   a domain the server serves, for healthcheck (default raumboard.de)
 set -euo pipefail
 
-HOST=deploy-host
-APP=/opt/raumboard/app
-cd "$(dirname "$0")/.."
+HERE="$(cd "$(dirname "$0")/.." && pwd)"
+[ -f "$HERE/deploy/deploy.env" ] && source "$HERE/deploy/deploy.env"
+
+HOST="${DEPLOY_HOST:?set DEPLOY_HOST (SSH host or alias of the target server)}"
+APP="${DEPLOY_PATH:-/opt/raumboard/app}"
+SVC_USER="${DEPLOY_USER:-raumboard}"
+SERVICE="${DEPLOY_SERVICE:-raumboard}"
+DOMAIN="${DEPLOY_DOMAIN:-raumboard.de}"
+cd "$HERE"
 
 npm run build
 
@@ -16,4 +29,4 @@ rsync -az --delete \
   dist server src \
   "$HOST:$APP/"
 
-ssh "$HOST" "cd $APP && npm ci --omit=dev --no-audit --no-fund && chown -R raumboard:raumboard /opt/raumboard/app && systemctl restart raumboard && sleep 2 && systemctl is-active raumboard && curl -sf -o /dev/null http://127.0.0.1:3211/ask?domain=raumboard.de && echo 'deploy ok'"
+ssh "$HOST" "cd $APP && npm ci --omit=dev --no-audit --no-fund && chown -R $SVC_USER:$SVC_USER $APP && systemctl restart $SERVICE && sleep 2 && systemctl is-active $SERVICE && curl -sf -o /dev/null http://127.0.0.1:3211/ask?domain=$DOMAIN && echo 'deploy ok'"

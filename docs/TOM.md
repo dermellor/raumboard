@@ -1,8 +1,9 @@
 # Anlage 1 — Technische und organisatorische Maßnahmen (Art. 32 DSGVO)
 
-> Beschreibt den **tatsächlichen** Stand der Raumboard-Instanz (gehosteter
-> Betrieb). Bei Architekturänderungen fortschreiben. Kein Rechtsrat.
-> Stand: Juli 2026.
+> Beschreibt den Stand einer gehosteten Raumboard-Instanz und dient als Vorlage.
+> Die mit «…» markierten Felder (Betreiber-Name/-Kontakt) sowie die konkret
+> genannten Dienstleister (Hosting, Backup-Speicher) sind an den tatsächlichen
+> Betrieb anzupassen. Bei Architekturänderungen fortschreiben. Kein Rechtsrat.
 
 ## 0. Grundprinzip: Datenminimierung
 
@@ -77,6 +78,6 @@ Datenbank und wird mit der nächsten Sicherung in den Backups nachvollzogen.
 30 Tagen unwiederbringlich gelöscht (auf Wunsch mit vorheriger Herausgabe als
 CSV/JSON), die Löschung wird bestätigt.
 
-**Ansprechpartner für Datenschutzvorfälle:** Marcel Mellor, mail@marcelmellor.com.
+**Ansprechpartner für Datenschutzvorfälle:** «BETREIBER_NAME», «BETREIBER_KONTAKT».
 Meldung an die Schule unverzüglich, spätestens innerhalb von 24 Stunden nach
 Kenntnis.
