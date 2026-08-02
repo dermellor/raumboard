@@ -1,0 +1,6 @@
+[Unit]
+Description=Raumboard nightly backup to Bunny Storage
+
+[Service]
+Type=oneshot
+ExecStart=/opt/raumboard/backup.sh

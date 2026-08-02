@@ -1,0 +1,26 @@
+[Unit]
+Description=Raumboard (Lernraum-Board fuer Schulen)
+After=network.target
+
+[Service]
+Type=simple
+User=raumboard
+Group=raumboard
+WorkingDirectory=/opt/raumboard/app
+EnvironmentFile=/opt/raumboard/.env
+ExecStart=/opt/raumboard/app/node_modules/.bin/tsx server/index.ts
+Restart=always
+RestartSec=3
+
+# hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/raumboard/data
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target
