@@ -36,3 +36,10 @@ DEPLOY.local.md
 # Maintainer-only Deploy-Konfig + persönlicher Bunny-Demo-Upload (nicht public)
 deploy/*.env
 scripts/deploy-bunny.py
+
+# Konfiguration mit echten Werten. Instanz-Profile liegen ohnehin außerhalb des
+# Repos (~/.config/raumboard/instances/, siehe scripts/instance.sh); diese Regel
+# fängt eine lokal ausgefüllte Kopie von .env.example ab.
+.env
+.env.*
+!.env.example

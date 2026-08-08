@@ -84,25 +84,106 @@ A kid can book into a room iff the room `isOpen`, has free capacity, and its
 
 ## Ports
 
-| Port  | Service                          |
-| ----- | -------------------------------- |
-| 3210  | Vite dev server (`strictPort`)   |
-| 3211  | reserved: local API (Phase 2)    |
+Ports come from the instance profile (`RAUMBOARD_WEB_PORT`, `RAUMBOARD_PORT`), so
+the numbers below are one host's assignment rather than a property of the project.
+Both the Vite config and `scripts/dev-prep.sh` read them, which is what stops one
+instance from killing the other's server.
+
+| Port  | Service                                   |
+| ----- | ----------------------------------------- |
+| 3210  | Vite dev server, instance `selfhosted`    |
+| 3211  | API server, instance `selfhosted`         |
+| 3213  | Vite dev server, instance `hosted`        |
+| 3214  | API server, instance `hosted`             |
 
 **Local dev runs the real API stack, not demo mode.** `npm run dev` (and the PM2
 `dev:pm2`) start API server + Vite concurrently in API mode with HMR. With
-`RAUMBOARD_DEV=1` (set by `dev:api`, guarded by `!PROD`) the server auto-provisions
-the `dev` tenant with seed data and fixed local credentials:
-**login `dev@raumboard.local` / `raumboard`, teacher PIN `0000`**. Local HTTPS URL:
-`https://raumboard.localhost` (Caddy → Vite 3210 → proxies `/api` + WS to API 3211).
+`RAUMBOARD_DEV=1` (set by `scripts/dev-api.sh`, guarded by `!PROD`) the server
+auto-provisions the **default tenant** with seed data and fixed local credentials:
+**login `dev@raumboard.local` / `raumboard`, teacher PIN `0000`**. Which tenant
+that is comes from `RAUMBOARD_DEFAULT_TENANT`; with no profile it is `dev`. In
+platform mode the variable is empty, so nothing is auto-provisioned and schools
+are created with the CLI instead.
+
+Local HTTPS goes through a reverse proxy that terminates TLS and forwards to the
+Vite port, which proxies `/api` and the WebSocket on to the API port.
 `npm run dev:demo` runs the old frontend-only localStorage mode if ever needed.
+
+## Instances
+
+A tenant is a school inside one deployment. An **instance** is a whole
+deployment: a local test board, a staging server, production. One checkout
+addresses several of them, so which one is being worked on has to be a single
+variable rather than an edit pass over config files.
+
+Instance values live **outside the repo**, one file per instance:
+
+```
+~/.config/raumboard/instances/<name>.env
+```
+
+Selected by naming it, with anything already in the environment winning:
+
+```bash
+RAUMBOARD_INSTANCE=test npm run dev
+RAUMBOARD_INSTANCE=prod bash deploy/deploy.sh
+```
+
+`RAUMBOARD_INSTANCE_DIR` moves the profile directory. A name is a single path
+segment of `[A-Za-z0-9._-]`; anything else is refused rather than resolved. A
+named profile that does not exist is a hard error, so a typo cannot silently
+deploy to the wrong host. Unset `RAUMBOARD_INSTANCE` is the plain
+single-deployment case and reads nothing outside the repo — that is what a fresh
+clone and the systemd unit both do, the unit taking its environment from
+`EnvironmentFile` instead.
+
+The loader is [`scripts/instance.sh`](scripts/instance.sh), sourced by
+[`scripts/dev-api.sh`](scripts/dev-api.sh), [`scripts/dev-web.sh`](scripts/dev-web.sh),
+[`scripts/dev-prep.sh`](scripts/dev-prep.sh), [`scripts/cli.sh`](scripts/cli.sh)
+and [`deploy/deploy.sh`](deploy/deploy.sh). Profiles hold plain `KEY=value` lines
+and are read verbatim, so paths in them are absolute (`~` is not expanded). Every
+variable is listed in [`.env.example`](.env.example).
+
+### The two operating modes are two instances
+
+The product ships in two shapes, and both are worth having running locally,
+because they differ in exactly the thing that is easy to break:
+
+| Mode           | `RAUMBOARD_DEFAULT_TENANT` | Tenant comes from            |
+| -------------- | -------------------------- | ---------------------------- |
+| **self-hosted** | set to the one school's slug | nothing, every Host is that school |
+| **platform**    | empty                       | the Host header, `<slug>.<RAUMBOARD_DOMAIN>` |
+
+An empty `RAUMBOARD_DEFAULT_TENANT` is what selects platform mode, and it also
+turns off the dev auto-seed, since a platform has no single school to seed.
+`scripts/dev-api.sh` therefore defaults it with `${VAR-dev}` rather than
+`${VAR:-dev}`: a profile that sets it to the empty string means it.
+
+Both modes run side by side from one checkout, so each instance carries its own
+ports (`RAUMBOARD_WEB_PORT`, `RAUMBOARD_PORT`) and its own `RAUMBOARD_DATA`. The
+Vite config reads both port variables, which is also what keeps `/api` proxying
+to the right server. `changeOrigin` stays off on that proxy: the API resolves the
+tenant from the Host header, so it has to survive the hop.
+
+Schools in platform mode are created with the CLI, against the named instance:
+
+```bash
+RAUMBOARD_INSTANCE=hosted npm run cli -- create-school demo "Demoschule" admin@example.org --seed
+RAUMBOARD_INSTANCE=hosted npm run cli -- list
+```
+
+No deployment's configuration is a file in the working tree this way, which is
+what keeps the public repo free of the operator's hosts, domains and tenants.
+The same rule applies to school data: `data/` is gitignored, and seeds carry
+generated dummy names only (see „Privacy rule").
 
 ## Deploy
 
 The app self-hosts as a Node/Hono server (SQLite per tenant, WebSockets) behind a
 reverse proxy that terminates TLS. Env config lives in a server-side `.env` (session
-secret, base domain, backup credentials — never in the repo). Per-school DBs back up
-nightly to object storage. A Docker/Compose self-hosting path is the Phase-4 goal.
+secret, base domain, backup credentials — never in the repo), documented in
+[`.env.example`](.env.example). Per-school DBs back up nightly to object storage.
+A Docker/Compose self-hosting path is the Phase-4 goal.
 
 **Static demo:** `npm run build` produces a `dist/` that runs in demo mode
 (frontend-only localStorage store), suitable for any static host.

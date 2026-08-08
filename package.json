@@ -6,10 +6,11 @@
   "scripts": {
     "dev": "bash scripts/dev-prep.sh && concurrently -k -n api,web -c blue,cyan \"npm:dev:api\" \"npm:dev:web\"",
     "dev:pm2": "concurrently -k -n api,web -c blue,cyan \"npm:dev:api\" \"npm:dev:web\"",
-    "dev:api": "RAUMBOARD_DEFAULT_TENANT=dev RAUMBOARD_DEV=1 tsx watch server/index.ts",
-    "dev:web": "VITE_API=true vite",
+    "dev:api": "bash scripts/dev-api.sh",
+    "dev:web": "bash scripts/dev-web.sh",
     "dev:demo": "vite",
     "dev:worktree": "vite --strictPort --port ${WT_PORT:-32100}",
+    "cli": "bash scripts/cli.sh",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview"

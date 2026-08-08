@@ -4,7 +4,12 @@
 
 set -e
 
-PORTS="3210 3211"  # 3210 = Vite (web), 3211 = API server
+HERE="$(cd "$(dirname "$0")/.." && pwd)"
+source "$HERE/scripts/instance.sh"
+
+# Only this instance's own ports. A second instance from the same checkout
+# (RAUMBOARD_INSTANCE) listens elsewhere and must not be killed from here.
+PORTS="${RAUMBOARD_WEB_PORT:-3210} ${RAUMBOARD_PORT:-3211}"  # web, API
 # Only a real *listener* blocks binding to the port. Match `-sTCP:LISTEN` so we
 # don't trip over leftover client sockets in CLOSED/TIME_WAIT state — those
 # don't prevent a new server from listening, and killing their owner would take
