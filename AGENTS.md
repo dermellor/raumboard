@@ -76,6 +76,51 @@ sheet's structure). The school enters real data in production only.
 - `src/EmojiButton.tsx` + `src/emojis.ts` — offline emoji picker with German
   keyword search.
 
+## Schema migrations
+
+The schema is an **ordered set of files** in `server/migrations/`
+(`NNNN_lower_snake_case.sql`, filename order = apply order), tracked per tenant
+database in a `schema_migrations` table. Shipping a schema change means adding a
+file. Before this, `migrate()` knew a single step (empty file → `schema.sql` →
+`user_version = 1`), so any *later* change would have sat there unnoticed.
+
+**It applies automatically when a tenant database is opened**, which is the
+opposite of the convention's Postgres example, and deliberate: this process owns
+these files exclusively, SQLite has a single writer, and a school's database is
+created lazily the first time it is served. There is no fixed list of databases to
+migrate in advance, so a "run the CLI first" gate would be an operator task per
+school, including schools that did not exist at deploy time. Ordered, tracked and
+transactional it still is; only the trigger differs, and it may differ *because* the
+app owns the store exclusively.
+
+Auto-applying is only safe because it never guesses:
+
+- **A database newer than the code is refused, loudly.** A tracking row naming a
+  migration this build does not have means someone rolled the code back. Serving it
+  would write through a schema we misunderstand, so `openTenant` throws instead.
+  There is no downgrade path.
+- **One transaction per file, tracking row included**, so a failure leaves neither a
+  half-applied schema nor a row claiming success (tested).
+- **Names are validated on every open.** A duplicate number is refused, because two
+  branches that each grab `0002_` merge cleanly in git and then run in alphabetical
+  order of their names, which neither author intended. Gaps are fine: renumbering
+  renames a file live databases already record as applied.
+
+**Adding one:** drop `000N_what_it_does.sql` into `server/migrations/`. No BEGIN or
+COMMIT (the runner wraps it, and better-sqlite3 rejects a nested transaction). Name
+a destructive change `..._breaking.sql`, which makes it visible in review and logs a
+warning when it runs. A one-off data cleanup is **not** a migration: a migration is
+replayed by every database forever, a cleanup happened once to one dataset, so it
+belongs in `scripts/`.
+
+Databases from before the tracking table are **adopted automatically**: they carry
+`user_version = 1`, which had exactly one meaning, so `0001_init.sql` is recorded as
+applied without being re-run.
+
+`npm test` covers all of this ([`server/migrations.test.ts`](server/migrations.test.ts))
+against real SQLite files, including adoption, the downgrade refusal and the
+rollback of a failing migration.
+
 ## Booking rules
 
 A kid can book into a room iff the room `isOpen`, has free capacity, and its

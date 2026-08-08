@@ -12,6 +12,7 @@
     "dev:worktree": "vite --strictPort --port ${WT_PORT:-32100}",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
+    "test": "node --import tsx --test 'server/**/*.test.ts'",
     "preview": "vite preview"
   },
   "dependencies": {

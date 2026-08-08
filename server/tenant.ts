@@ -1,7 +1,8 @@
 import Database from 'better-sqlite3'
-import { existsSync, mkdirSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { migrate } from './migrations'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 
@@ -41,15 +42,7 @@ export function openTenant(slug: string, { create = false } = {}): Database.Data
   const db = new Database(dbPath(slug))
   db.pragma('journal_mode = WAL')
   db.pragma('foreign_keys = ON')
-  migrate(db)
+  migrate(db, slug)
   handles.set(slug, db)
   return db
-}
-
-function migrate(db: Database.Database): void {
-  const version = db.pragma('user_version', { simple: true }) as number
-  if (version < 1) {
-    db.exec(readFileSync(path.join(HERE, 'schema.sql'), 'utf8'))
-    db.pragma('user_version = 1')
-  }
 }
