@@ -57,6 +57,13 @@ Never commit real children's names. Seeds and fixtures use generated dummy names
 only (emoji symbol + first name + last-name initial, mirroring the original
 sheet's structure). The school enters real data in production only.
 
+## Form of address (German UI)
+
+The boards address the children informally („Wohin gehst du?"). Everything an
+adult uses (Verwaltung, login, teacher PIN, import) uses „Sie", or stays
+impersonal where no address is needed („Bitte mit den Zugangsdaten der Schule
+anmelden"). An admin-side string that duzt is a bug.
+
 ## Architecture (current, Phase 1)
 
 - Vite + React 19 + TypeScript; runtime deps: react, react-dom, lucide-react

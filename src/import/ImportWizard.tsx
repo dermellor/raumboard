@@ -95,7 +95,7 @@ export function ImportWizard({ onClose }: { onClose: () => void }) {
         </div>
       ) : !table ? (
         <div>
-          <p>Lade eine Excel- (.xlsx) oder CSV-Datei mit den Namen der Kinder hoch.</p>
+          <p>Laden Sie eine Excel- (.xlsx) oder CSV-Datei mit den Namen der Kinder hoch.</p>
           <div
             className="dropzone"
             onClick={() => fileInput.current?.click()}
@@ -120,7 +120,7 @@ export function ImportWizard({ onClose }: { onClose: () => void }) {
             }}
           />
           <p className="count">
-            Der volle Nachname bleibt auf deinem Gerät: nur Vorname und der erste Buchstabe des
+            Der volle Nachname bleibt auf Ihrem Gerät: nur Vorname und der erste Buchstabe des
             Nachnamens werden gespeichert.
           </p>
           {error && <p className="form-error">{error}</p>}
