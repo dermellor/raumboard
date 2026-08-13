@@ -7,7 +7,7 @@ import type { BoardState, BookResult } from './types'
 // corrects any race. Admin CRUD relies on the broadcast round-trip.
 
 let state: BoardState = { klasses: [], kids: [], rooms: [] }
-let meta: StoreMeta = { mode: 'api', ready: false, canBook: false, isAdmin: false, dev: false }
+let meta: StoreMeta = { mode: 'api', ready: false, canBook: false, isAdmin: false, dev: false, ephemeral: false }
 const listeners = new Set<() => void>()
 
 function notify() {
@@ -88,8 +88,10 @@ function connect() {
   }
 }
 
-void refetch()
-connect()
+// The first fetch comes before the socket on purpose: on the public demo it is
+// what mints the session cookie, and the upgrade needs that cookie to know which
+// board it is for. `finally` so an offline start still ends up in the retry loop.
+void refetch().finally(connect)
 // safety net: WS can silently miss frames across proxies/standby — resync
 setInterval(() => void refetch(), 60_000)
 
@@ -133,8 +135,8 @@ export const apiStore: BoardStore = {
   },
 
   reseed() {
-    // dev-only on the server (guarded there); no-op if forbidden
-    mutate('/api/admin/reseed')
+    // demo boards and local dev only (guarded on the server); no-op if forbidden
+    mutate('/api/reseed')
   },
 
   addRoom(name, emoji, capacity, scope) {

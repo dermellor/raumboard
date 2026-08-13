@@ -402,6 +402,29 @@ h1 {
   height: 1.1em;
 }
 
+/* public demo: opposite corner from the dev button so both can show at once */
+.demo-reset {
+  position: fixed;
+  left: 1rem;
+  bottom: 1rem;
+  z-index: 50;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: 999px;
+  border: 2px solid #0369a1;
+  background: #f0f9ff;
+  color: #0369a1;
+  font-weight: 700;
+  box-shadow: var(--shadow);
+}
+
+.demo-reset svg {
+  width: 1.1em;
+  height: 1.1em;
+}
+
 /* --- admin tab bar ------------------------------------------------------------- */
 
 .tabbar {

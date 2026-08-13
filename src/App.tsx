@@ -1,6 +1,6 @@
-import { Lock } from 'lucide-react'
+import { Lock, Sprout } from 'lucide-react'
 import { useRoute } from './router'
-import { lockDevice } from './store'
+import { lockDevice, reseed } from './store'
 import { useMeta } from './useBoard'
 import { Admin } from './views/Admin'
 import { Home } from './views/Home'
@@ -36,6 +36,17 @@ export function App() {
   return (
     <>
       {view}
+      {/* public demo: everyone may undo everyone's mess, no login needed */}
+      {meta.ephemeral && (
+        <button
+          className="demo-reset"
+          onClick={() => {
+            if (confirm('Demo auf den Ausgangszustand zurücksetzen?')) reseed()
+          }}
+        >
+          <Sprout /> Demo zurücksetzen
+        </button>
+      )}
       {/* local dev only: clear the session so the PIN gate can be tested */}
       {meta.dev && meta.canBook && (
         <button

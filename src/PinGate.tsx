@@ -14,7 +14,9 @@ export function PinGate({ onClose }: { onClose: () => void }) {
   const meta = useMeta()
   const length = meta.pinLength ?? null
   const inputRef = useRef<HTMLInputElement>(null)
-  const [pin, setPin] = useState('')
+  // the demo prefills its own PIN; filling the slots does not submit, so the
+  // gate still has to be confirmed and stays part of what a visitor sees
+  const [pin, setPin] = useState(meta.demoCredentials?.pin ?? '')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 

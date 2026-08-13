@@ -10,6 +10,16 @@ export type StoreMeta = {
   isAdmin: boolean
   /** server runs in local dev mode (RAUMBOARD_DEV) — enables test-only affordances */
   dev: boolean
+  /**
+   * This board is the public demo: the server holds it in RAM for this visitor
+   * only and stores nothing, so anyone may put it back to the seed data.
+   */
+  ephemeral: boolean
+  /**
+   * The demo's published login and PIN, so its forms can prefill themselves.
+   * Null on a school's board.
+   */
+  demoCredentials?: { email: string; password: string; pin: string } | null
   /** digit count of the teacher PIN (api mode), for the segmented gate display */
   pinLength?: number | null
 }

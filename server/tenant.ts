@@ -13,6 +13,19 @@ export const DEFAULT_TENANT = process.env.RAUMBOARD_DEFAULT_TENANT
 
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,62}$/
 
+/**
+ * The public demo, if this deployment serves one. That slug deliberately has no
+ * database file: it is served from RAM, one throwaway board per visitor, so the
+ * credentials can be published without anything a visitor types being kept
+ * (see `demo.ts`). Named here rather than there so `openTenant` can refuse it.
+ */
+export const DEMO_TENANT = (() => {
+  const value = process.env.RAUMBOARD_DEMO_TENANT?.trim()
+  if (!value) return null
+  if (!SLUG_RE.test(value)) throw new Error(`RAUMBOARD_DEMO_TENANT ist kein gültiger Slug: ${value}`)
+  return value
+})()
+
 export function dbPath(slug: string): string {
   return path.join(DATA_DIR, `${slug}.db`)
 }
@@ -37,6 +50,9 @@ export function openTenant(slug: string, { create = false } = {}): Database.Data
   const cached = handles.get(slug)
   if (cached) return cached
   if (!SLUG_RE.test(slug)) throw new Error(`invalid tenant slug: ${slug}`)
+  // The demo has no file, and creating one here would quietly turn the throwaway
+  // board into a stored one. Callers route it through openDemoBoard() instead.
+  if (slug === DEMO_TENANT) throw new Error(`tenant ${slug} is the in-memory demo, not a file`)
   if (!create && !tenantExists(slug)) throw new Error(`unknown tenant: ${slug}`)
   mkdirSync(DATA_DIR, { recursive: true })
   const db = new Database(dbPath(slug))

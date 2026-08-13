@@ -154,6 +154,8 @@ instance from killing the other's server.
 | 3211  | API server, instance `selfhosted`         |
 | 3213  | Vite dev server, instance `hosted`        |
 | 3214  | API server, instance `hosted`             |
+| 3216  | Vite dev server, instance `demo`          |
+| 3217  | API server, instance `demo`               |
 
 **Local dev runs the real API stack, not demo mode.** `npm run dev` (and the PM2
 `dev:pm2`) start API server + Vite concurrently in API mode with HMR. With
@@ -227,7 +229,7 @@ tenant from the Host header, so it has to survive the hop.
 Schools in platform mode are created with the CLI, against the named instance:
 
 ```bash
-RAUMBOARD_INSTANCE=hosted npm run cli -- create-school demo "Demoschule" admin@example.org --seed
+RAUMBOARD_INSTANCE=hosted npm run cli -- create-school lindenschule "Lindenschule" admin@example.org --seed
 RAUMBOARD_INSTANCE=hosted npm run cli -- list
 ```
 
@@ -235,6 +237,48 @@ No deployment's configuration is a file in the working tree this way, which is
 what keeps the public repo free of the operator's hosts, domains and tenants.
 The same rule applies to school data: `data/` is gitignored, and seeds carry
 generated dummy names only (see „Privacy rule").
+
+## Public demo (credentials may be published)
+
+`RAUMBOARD_DEMO_TENANT=<slug>` turns that subdomain into a demo whose login and
+teacher PIN can go on a website: **one throwaway board per visitor, held in RAM,
+never written to disk.** No `data/<slug>.db` exists for it, so there is nothing
+to back up, nothing to erase, and no personal data on the server to have an AVV
+question about. Everything lives in [`server/demo.ts`](server/demo.ts).
+
+The board id is what carries this. A school's id is its slug; the demo's is
+`<slug>#<session>`, taken from a `rb_demo` cookie the page load mints. SQLite
+handle, WebSocket registry and the signed auth cookies are all keyed by that id,
+which is what keeps two visitors apart without a second code path.
+
+- **Per visitor, not per device.** Tabs of one browser share the board and the WS
+  broadcast; a phone next to the whiteboard is a different session. The
+  "book here, watch it appear there" demo therefore only works within one browser.
+- **Reset is public.** `POST /api/reseed` needs no login on a demo board (it is
+  the visitor's own copy) and restores the seed *and* the published credentials,
+  in case someone changed the password in Verwaltung. The floating „Demo
+  zurücksetzen" button in [`src/App.tsx`](src/App.tsx) calls it; it shows when
+  `/api/state` reports `meta.ephemeral`. On a school's board the same endpoint is
+  refused with 403, so children's data can never be wiped through it.
+- **Boards expire.** Idle past `RAUMBOARD_DEMO_IDLE_MINUTES` (60) they are
+  dropped by a sweeper, and beyond `RAUMBOARD_DEMO_MAX_BOARDS` (200) the least
+  recently used one gives way, so a crawler minting sessions cannot grow the heap.
+- **Two configurations are refused at startup**, because both would look like they
+  work: a demo slug that has a database file (it would shadow a real school), and
+  a demo slug in self-hosted mode that differs from `RAUMBOARD_DEFAULT_TENANT`
+  (the demo host would be unreachable). Setting both to the same slug is the
+  supported way to make a whole instance a demo — that is what the local `demo`
+  instance does (`RAUMBOARD_INSTANCE=demo npm run dev`, http://localhost:3216).
+
+Credentials and school name come from `RAUMBOARD_DEMO_LOGIN` / `_PASSWORD` /
+`_PIN` / `_NAME`, defaulting to `demo@raumboard.de` / `raumboard-demo` / `1234` /
+„Demoschule". On a demo board `/api/state` returns them as `meta.demoCredentials`
+(null for a school), and the login form and the PIN gate prefill themselves from
+it: a visitor came to see the product, not to copy credentials off a website. The
+gate still has to be confirmed, so both steps stay visible — filling the slots
+programmatically does not submit them. `npm test` covers the isolation, the empty data directory, the
+reset, expiry and both startup refusals
+([`server/demo.test.ts`](server/demo.test.ts)).
 
 ## Deploy
 

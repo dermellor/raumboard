@@ -8,7 +8,18 @@ import { fileURLToPath } from 'node:url'
 import { WebSocketServer } from 'ws'
 import * as board from './board'
 import { hashSecret, makeToken, verifySecret, verifyToken } from './auth'
-import { BASE_DOMAIN, DEFAULT_TENANT, openTenant, slugFromHost, tenantExists } from './tenant'
+import { BASE_DOMAIN, DEFAULT_TENANT, DEMO_TENANT, openTenant, slugFromHost, tenantExists } from './tenant'
+import {
+  DEMO_SCHOOL_NAME,
+  demoBoardId,
+  demoCredentials,
+  isDemoBoard,
+  isSession,
+  newSession,
+  openDemoBoard,
+  resetDemoBoard,
+  startDemoSweeper,
+} from './demo'
 import { broadcast, register } from './ws'
 import { buildSeed } from '../src/seed'
 
@@ -21,8 +32,10 @@ const PROD = process.env.NODE_ENV === 'production'
 // never in production) auto-provision the default tenant with seed data and known
 // credentials, so the real API mode "just works" locally without deploying or CLI.
 // Guarded by !PROD so a self-hosted single-tenant production install is untouched.
+// Not when the default tenant IS the demo: that instance has no stored board to
+// provision, every visitor gets a fresh one from RAM.
 const DEV = process.env.RAUMBOARD_DEV === '1' && !PROD
-if (DEV && DEFAULT_TENANT) {
+if (DEV && DEFAULT_TENANT && DEFAULT_TENANT !== DEMO_TENANT) {
   const fresh = !tenantExists(DEFAULT_TENANT)
   const db = openTenant(DEFAULT_TENANT, { create: true })
   if (fresh) {
@@ -40,8 +53,17 @@ if (DEV && DEFAULT_TENANT) {
 const ADMIN_TTL = 30 * 24 * 3600
 const BOARD_TTL = 180 * 24 * 3600
 
-type Env = { Variables: { slug: string } }
+/**
+ * What a request acts on. For a school that is its tenant slug; for the demo it
+ * is one throwaway board per browser session, so the id carries the session.
+ * Everything downstream (SQLite handle, WS registry, cookie tokens) is keyed by
+ * this string, which is what keeps two demo visitors apart.
+ */
+type Env = { Variables: { boardId: string } }
 const app = new Hono<Env>()
+
+const DEMO_COOKIE = 'rb_demo'
+const DEMO_TTL = 12 * 3600
 
 // --- TLS on-demand check (Caddy `ask`) --------------------------------------
 
@@ -50,20 +72,25 @@ app.get('/ask', (c) => {
   const host = domain.split(':')[0].toLowerCase()
   if (host === BASE_DOMAIN || host === `www.${BASE_DOMAIN}`) return c.text('ok')
   const slug = slugFromHost(host)
-  if (slug && tenantExists(slug)) return c.text('ok')
+  // the demo answers for its own host although it has no database file
+  if (slug && (slug === DEMO_TENANT || tenantExists(slug))) return c.text('ok')
   return c.text('unknown', 404)
 })
 
 // --- helpers -----------------------------------------------------------------
 
-function authInfo(c: any, slug: string) {
-  const isAdmin = verifyToken(getCookie(c, 'rb_admin'), slug, 'admin')
-  const hasBoard = verifyToken(getCookie(c, 'rb_board'), slug, 'board')
+function authInfo(c: any, boardId: string) {
+  const isAdmin = verifyToken(getCookie(c, 'rb_admin'), boardId, 'admin')
+  const hasBoard = verifyToken(getCookie(c, 'rb_board'), boardId, 'board')
   return { isAdmin, canBook: isAdmin || hasBoard }
 }
 
-function stateMessage(slug: string) {
-  const db = openTenant(slug)
+function openBoard(boardId: string) {
+  return isDemoBoard(boardId) ? openDemoBoard(boardId) : openTenant(boardId)
+}
+
+function stateMessage(boardId: string) {
+  const db = openBoard(boardId)
   return { type: 'state', state: board.loadState(db) }
 }
 
@@ -71,29 +98,50 @@ function cookieOpts() {
   return { httpOnly: true, secure: PROD, sameSite: 'Lax' as const, path: '/' }
 }
 
+/** This browser's demo board, minting the session cookie on first contact. */
+function demoBoardFor(c: any): string {
+  const existing = getCookie(c, DEMO_COOKIE)
+  if (isSession(existing)) return demoBoardId(existing)
+  const session = newSession()
+  setCookie(c, DEMO_COOKIE, session, { ...cookieOpts(), maxAge: DEMO_TTL })
+  return demoBoardId(session)
+}
+
+/** Host → board id, or null for the landing page and unknown schools. */
+function boardFor(c: any): string | null {
+  const slug = slugFromHost(c.req.header('host'))
+  if (!slug) return null
+  if (slug === DEMO_TENANT) return demoBoardFor(c)
+  return tenantExists(slug) ? slug : null
+}
+
 // --- API ----------------------------------------------------------------------
 
 const api = new Hono<Env>()
 
 api.use('*', async (c, next) => {
-  const slug = slugFromHost(c.req.header('host'))
-  if (!slug || !tenantExists(slug)) return c.json({ error: 'unknown tenant' }, 404)
-  c.set('slug', slug)
+  const boardId = boardFor(c)
+  if (!boardId) return c.json({ error: 'unknown tenant' }, 404)
+  c.set('boardId', boardId)
   await next()
 })
 
 api.get('/state', (c) => {
-  const slug = c.get('slug')
-  const db = openTenant(slug)
-  const { isAdmin, canBook } = authInfo(c, slug)
+  const boardId = c.get('boardId')
+  const db = openBoard(boardId)
+  const { isAdmin, canBook } = authInfo(c, boardId)
   return c.json({
     state: board.loadState(db),
     meta: {
       mode: 'api',
-      schoolName: board.getConfig(db, 'school_name') ?? slug,
+      schoolName: board.getConfig(db, 'school_name') ?? boardId,
       isAdmin,
       canBook,
       dev: DEV,
+      // throwaway demo board: nothing is stored, so the UI may offer a reset
+      ephemeral: isDemoBoard(boardId),
+      // published anyway, and prefilled so a visitor reaches the product directly
+      demoCredentials: isDemoBoard(boardId) ? demoCredentials() : null,
       // digit count of the teacher PIN, so the gate can show the right number of
       // slots. Only the length (not the PIN) — harmless for an anti-mischief PIN.
       pinLength: Number(board.getConfig(db, 'pin_length')) || null,
@@ -102,8 +150,8 @@ api.get('/state', (c) => {
 })
 
 api.post('/login', async (c) => {
-  const slug = c.get('slug')
-  const db = openTenant(slug)
+  const boardId = c.get('boardId')
+  const db = openBoard(boardId)
   const { email, password } = await c.req.json<{ email?: string; password?: string }>()
   const storedEmail = board.getConfig(db, 'admin_email')
   const storedHash = board.getConfig(db, 'admin_hash')
@@ -113,7 +161,7 @@ api.post('/login', async (c) => {
     !verifySecret(password, storedHash)
   )
     return c.json({ error: 'E-Mail oder Passwort falsch' }, 401)
-  setCookie(c, 'rb_admin', makeToken(slug, 'admin', ADMIN_TTL), { ...cookieOpts(), maxAge: ADMIN_TTL })
+  setCookie(c, 'rb_admin', makeToken(boardId, 'admin', ADMIN_TTL), { ...cookieOpts(), maxAge: ADMIN_TTL })
   return c.json({ ok: true })
 })
 
@@ -124,13 +172,13 @@ api.post('/logout', (c) => {
 })
 
 api.post('/pin', async (c) => {
-  const slug = c.get('slug')
-  const db = openTenant(slug)
+  const boardId = c.get('boardId')
+  const db = openBoard(boardId)
   const { pin } = await c.req.json<{ pin?: string }>()
   const storedHash = board.getConfig(db, 'pin_hash')
   if (!pin || !storedHash || !verifySecret(pin.trim(), storedHash))
     return c.json({ error: 'PIN falsch' }, 401)
-  setCookie(c, 'rb_board', makeToken(slug, 'board', BOARD_TTL), { ...cookieOpts(), maxAge: BOARD_TTL })
+  setCookie(c, 'rb_board', makeToken(boardId, 'board', BOARD_TTL), { ...cookieOpts(), maxAge: BOARD_TTL })
   return c.json({ ok: true })
 })
 
@@ -139,54 +187,59 @@ api.use('/book', boardGuard)
 api.use('/unbook', boardGuard)
 api.use('/reset', boardGuard)
 async function boardGuard(c: any, next: () => Promise<void>) {
-  if (!authInfo(c, c.get('slug')).canBook) return c.json({ error: 'locked' }, 401)
+  if (!authInfo(c, c.get('boardId')).canBook) return c.json({ error: 'locked' }, 401)
   await next()
 }
 
 api.post('/book', async (c) => {
-  const slug = c.get('slug')
+  const boardId = c.get('boardId')
   const { kidId, roomId } = await c.req.json<{ kidId?: string; roomId?: string }>()
   if (!kidId || !roomId) return c.json({ error: 'kidId/roomId fehlt' }, 400)
-  const result = board.book(openTenant(slug), kidId, roomId)
+  const result = board.book(openBoard(boardId), kidId, roomId)
   if (!result.ok) return c.json(result, 409)
-  broadcast(slug, stateMessage(slug))
+  broadcast(boardId, stateMessage(boardId))
   return c.json(result)
 })
 
 api.post('/unbook', async (c) => {
-  const slug = c.get('slug')
+  const boardId = c.get('boardId')
   const { kidId } = await c.req.json<{ kidId?: string }>()
   if (!kidId) return c.json({ error: 'kidId fehlt' }, 400)
-  board.unbook(openTenant(slug), kidId)
-  broadcast(slug, stateMessage(slug))
+  board.unbook(openBoard(boardId), kidId)
+  broadcast(boardId, stateMessage(boardId))
   return c.json({ ok: true })
 })
 
 api.post('/reset', (c) => {
-  const slug = c.get('slug')
-  board.reset(openTenant(slug))
-  broadcast(slug, stateMessage(slug))
+  const boardId = c.get('boardId')
+  board.reset(openBoard(boardId))
+  broadcast(boardId, stateMessage(boardId))
+  return c.json({ ok: true })
+})
+
+/**
+ * Back to the seed data. Open to anyone on a demo board, because that board is
+ * the visitor's own throwaway copy and undoing their mess is the point; also
+ * allowed in local dev. On a school's board it is refused outright, so real
+ * children's data can never be destroyed through the API.
+ */
+api.post('/reseed', (c) => {
+  const boardId = c.get('boardId')
+  if (isDemoBoard(boardId)) resetDemoBoard(boardId)
+  else if (DEV) board.replaceAll(openBoard(boardId), buildSeed())
+  else return c.json({ error: 'nicht erlaubt' }, 403)
+  broadcast(boardId, stateMessage(boardId))
   return c.json({ ok: true })
 })
 
 /** Admin CRUD. */
 api.use('/admin/*', async (c, next) => {
-  if (!authInfo(c, c.get('slug')).isAdmin) return c.json({ error: 'admin required' }, 401)
+  if (!authInfo(c, c.get('boardId')).isAdmin) return c.json({ error: 'admin required' }, 401)
   await next()
 })
 
-/** Dev-only: wipe tenant data and reload the demo seed. Guarded by DEV so real
- * children's data in production can never be destroyed via the API. */
-api.post('/admin/reseed', (c) => {
-  if (!DEV) return c.json({ error: 'nur im Entwicklungsmodus' }, 403)
-  const slug = c.get('slug')
-  board.replaceAll(openTenant(slug), buildSeed())
-  broadcast(slug, stateMessage(slug))
-  return c.json({ ok: true })
-})
-
 api.post('/admin/import', async (c) => {
-  const slug = c.get('slug')
+  const boardId = c.get('boardId')
   const body = await c.req.json<{
     mode?: 'append' | 'replace'
     targetKlass?: string | null
@@ -197,74 +250,74 @@ api.post('/admin/import', async (c) => {
     .filter((k) => k.name)
   if (kids.length === 0) return c.json({ error: 'keine Kinder in der Datei' }, 400)
   const mode = body.mode === 'replace' ? 'replace' : 'append'
-  const result = board.importKids(openTenant(slug), kids, body.targetKlass ?? null, mode)
-  broadcast(slug, stateMessage(slug))
+  const result = board.importKids(openBoard(boardId), kids, body.targetKlass ?? null, mode)
+  broadcast(boardId, stateMessage(boardId))
   return c.json({ ok: true, ...result })
 })
 
 api.post('/admin/rooms', async (c) => {
   const { name, emoji, capacity, scope } = await c.req.json()
   if (!name?.trim()) return c.json({ error: 'name fehlt' }, 400)
-  board.addRoom(openTenant(c.get('slug')), name.trim(), emoji || '🚪', Number(capacity) || 0, scope || 'all')
-  broadcast(c.get('slug'), stateMessage(c.get('slug')))
+  board.addRoom(openBoard(c.get('boardId')), name.trim(), emoji || '🚪', Number(capacity) || 0, scope || 'all')
+  broadcast(c.get('boardId'), stateMessage(c.get('boardId')))
   return c.json({ ok: true })
 })
 
 api.patch('/admin/rooms/:id', async (c) => {
-  board.updateRoom(openTenant(c.get('slug')), c.req.param('id'), await c.req.json())
-  broadcast(c.get('slug'), stateMessage(c.get('slug')))
+  board.updateRoom(openBoard(c.get('boardId')), c.req.param('id'), await c.req.json())
+  broadcast(c.get('boardId'), stateMessage(c.get('boardId')))
   return c.json({ ok: true })
 })
 
 api.delete('/admin/rooms/:id', (c) => {
-  board.removeRoom(openTenant(c.get('slug')), c.req.param('id'))
-  broadcast(c.get('slug'), stateMessage(c.get('slug')))
+  board.removeRoom(openBoard(c.get('boardId')), c.req.param('id'))
+  broadcast(c.get('boardId'), stateMessage(c.get('boardId')))
   return c.json({ ok: true })
 })
 
 api.post('/admin/kids', async (c) => {
   const { klassId, symbol, name } = await c.req.json()
   if (!name?.trim() || !klassId) return c.json({ error: 'name/klassId fehlt' }, 400)
-  board.addKid(openTenant(c.get('slug')), klassId, symbol || '⭐', name.trim())
-  broadcast(c.get('slug'), stateMessage(c.get('slug')))
+  board.addKid(openBoard(c.get('boardId')), klassId, symbol || '⭐', name.trim())
+  broadcast(c.get('boardId'), stateMessage(c.get('boardId')))
   return c.json({ ok: true })
 })
 
 api.patch('/admin/kids/:id', async (c) => {
-  board.updateKid(openTenant(c.get('slug')), c.req.param('id'), await c.req.json())
-  broadcast(c.get('slug'), stateMessage(c.get('slug')))
+  board.updateKid(openBoard(c.get('boardId')), c.req.param('id'), await c.req.json())
+  broadcast(c.get('boardId'), stateMessage(c.get('boardId')))
   return c.json({ ok: true })
 })
 
 api.delete('/admin/kids/:id', (c) => {
-  board.removeKid(openTenant(c.get('slug')), c.req.param('id'))
-  broadcast(c.get('slug'), stateMessage(c.get('slug')))
+  board.removeKid(openBoard(c.get('boardId')), c.req.param('id'))
+  broadcast(c.get('boardId'), stateMessage(c.get('boardId')))
   return c.json({ ok: true })
 })
 
 api.post('/admin/klasses', async (c) => {
   const { name, emoji } = await c.req.json()
   if (!name?.trim()) return c.json({ error: 'name fehlt' }, 400)
-  board.addKlass(openTenant(c.get('slug')), name.trim(), emoji || undefined)
-  broadcast(c.get('slug'), stateMessage(c.get('slug')))
+  board.addKlass(openBoard(c.get('boardId')), name.trim(), emoji || undefined)
+  broadcast(c.get('boardId'), stateMessage(c.get('boardId')))
   return c.json({ ok: true })
 })
 
 api.patch('/admin/klasses/:id', async (c) => {
-  board.updateKlass(openTenant(c.get('slug')), c.req.param('id'), await c.req.json())
-  broadcast(c.get('slug'), stateMessage(c.get('slug')))
+  board.updateKlass(openBoard(c.get('boardId')), c.req.param('id'), await c.req.json())
+  broadcast(c.get('boardId'), stateMessage(c.get('boardId')))
   return c.json({ ok: true })
 })
 
 api.delete('/admin/klasses/:id', (c) => {
-  board.removeKlass(openTenant(c.get('slug')), c.req.param('id'))
-  broadcast(c.get('slug'), stateMessage(c.get('slug')))
+  board.removeKlass(openBoard(c.get('boardId')), c.req.param('id'))
+  broadcast(c.get('boardId'), stateMessage(c.get('boardId')))
   return c.json({ ok: true })
 })
 
 /** Credentials self-service — both re-verify the current admin password. */
 api.post('/admin/change-password', async (c) => {
-  const db = openTenant(c.get('slug'))
+  const db = openBoard(c.get('boardId'))
   const { current, next } = await c.req.json<{ current?: string; next?: string }>()
   const storedHash = board.getConfig(db, 'admin_hash')
   if (!current || !storedHash || !verifySecret(current, storedHash))
@@ -276,7 +329,7 @@ api.post('/admin/change-password', async (c) => {
 })
 
 api.post('/admin/change-pin', async (c) => {
-  const db = openTenant(c.get('slug'))
+  const db = openBoard(c.get('boardId'))
   const { password, pin } = await c.req.json<{ password?: string; pin?: string }>()
   const storedHash = board.getConfig(db, 'admin_hash')
   if (!password || !storedHash || !verifySecret(password, storedHash))
@@ -309,14 +362,21 @@ app.use('/favicon.svg', serveStatic({ root: path.relative(process.cwd(), DIST) }
 app.get('*', (c) => {
   const slug = slugFromHost(c.req.header('host'))
   if (!slug) return c.html(LANDING)
-  if (!tenantExists(slug))
+  const demo = slug === DEMO_TENANT
+  if (!demo && !tenantExists(slug))
     return c.html(`<!doctype html><meta charset="utf-8"><title>Unbekannte Schule</title>
 <p style="font-family:system-ui;margin:4rem auto;max-width:30rem">Diese Schul-Adresse ist nicht eingerichtet.</p>`, 404)
   if (!indexHtml) return c.text('frontend build fehlt (npm run build)', 500)
-  const db = openTenant(slug)
-  const config = JSON.stringify({
-    schoolName: board.getConfig(db, 'school_name') ?? slug,
-  })
+  let schoolName: string
+  if (demo) {
+    // mint the session cookie here, before the app boots and opens its WebSocket;
+    // the name comes from config so no board has to be created just to render HTML
+    demoBoardFor(c)
+    schoolName = DEMO_SCHOOL_NAME
+  } else {
+    schoolName = board.getConfig(openTenant(slug), 'school_name') ?? slug
+  }
+  const config = JSON.stringify({ schoolName })
   return c.html(indexHtml.replace('</head>', `<script>window.__RAUMBOARD__=${config}</script></head>`))
 })
 
@@ -324,7 +384,12 @@ app.get('*', (c) => {
 
 const server = serve({ fetch: app.fetch, port: PORT, hostname: '127.0.0.1' }, (info) => {
   console.log(`raumboard server on http://127.0.0.1:${info.port} (domain: ${BASE_DOMAIN})`)
+  if (DEMO_TENANT)
+    console.log(
+      `Demo: ${DEMO_TENANT}.${BASE_DOMAIN} — pro Besucher ein eigenes Board, nur im Speicher`,
+    )
 })
+startDemoSweeper()
 
 const wss = new WebSocketServer({ noServer: true })
 server.on('upgrade', (req, socket, head) => {
@@ -333,13 +398,36 @@ server.on('upgrade', (req, socket, head) => {
     socket.destroy()
     return
   }
-  const slug = slugFromHost(req.headers.host)
-  if (!slug || !tenantExists(slug)) {
+  const boardId = wsBoardId(req.headers.host, req.headers.cookie)
+  if (!boardId) {
     socket.destroy()
     return
   }
   wss.handleUpgrade(req, socket, head, (ws) => {
-    register(slug, ws)
-    ws.send(JSON.stringify(stateMessage(slug)))
+    register(boardId, ws)
+    ws.send(JSON.stringify(stateMessage(boardId)))
   })
 })
+
+/**
+ * Same resolution as `boardFor`, from raw upgrade headers (no Hono context here).
+ * A demo socket without the session cookie is refused rather than pointed at a
+ * new board: the page load sets that cookie, so the client only has to reconnect.
+ */
+function wsBoardId(host: string | undefined, cookieHeader: string | undefined): string | null {
+  const slug = slugFromHost(host)
+  if (!slug) return null
+  if (slug === DEMO_TENANT) {
+    const session = cookieValue(cookieHeader, DEMO_COOKIE)
+    return isSession(session) ? demoBoardId(session) : null
+  }
+  return tenantExists(slug) ? slug : null
+}
+
+function cookieValue(header: string | undefined, name: string): string | undefined {
+  for (const part of (header ?? '').split(';')) {
+    const eq = part.indexOf('=')
+    if (eq > 0 && part.slice(0, eq).trim() === name) return part.slice(eq + 1).trim()
+  }
+  return undefined
+}

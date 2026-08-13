@@ -2,11 +2,14 @@ import { LogIn } from 'lucide-react'
 import { useState } from 'react'
 import { TopBar } from '../components'
 import { login } from '../store'
+import { useMeta } from '../useBoard'
 
 /** Admin login for the Verwaltung (api mode). */
 export function Login() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  // the demo hands its own credentials over, so nobody has to copy them in
+  const demo = useMeta().demoCredentials
+  const [email, setEmail] = useState(demo?.email ?? '')
+  const [password, setPassword] = useState(demo?.password ?? '')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
