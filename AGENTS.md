@@ -37,6 +37,13 @@ First rollout is a pilot primary school in NRW.
 - **AVV/DSGVO:** hosting for schools makes the hosting operator an
   Auftragsverarbeiter even when free — AVV template + TOM doc required before the
   first real kid data. Templates live in `docs/`.
+  [`scripts/build-avv-pdf.sh <schule-slug>`](scripts/build-avv-pdf.sh) turns them
+  into one signable PDF. The party details of a school (its name, its address, the
+  operator's private address) are values, not template edits, so they live outside
+  the repo in `~/.config/raumboard/avv/<slug>.env`, in the same `KEY=value` shape
+  as an instance profile and read by the same loader. A value that is missing
+  leaves its placeholder standing in the PDF and warns, which is visible while
+  proofreading; a plausible default would not be.
 
 ## Status / roadmap
 

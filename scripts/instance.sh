@@ -21,6 +21,27 @@
 # the repo is read, which is what a fresh clone and the systemd unit both do
 # (the unit gets its environment from EnvironmentFile instead).
 
+# Read a plain KEY=value file into the environment without letting it win over
+# an explicit override: a value already set stays. Shared with the AVV builder,
+# which keeps its per-school values in the same shape (scripts/build-avv-pdf.sh).
+raumboard_load_env_file() {
+  local file="$1" key value line
+  while IFS= read -r line || [ -n "$line" ]; do
+    [[ "$line" =~ ^[[:space:]]*(#|$) ]] && continue
+    [[ "$line" =~ ^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*=(.*)$ ]] || continue
+    key="${BASH_REMATCH[1]}"
+    value="${BASH_REMATCH[2]}"
+    value="${value#"${value%%[![:space:]]*}"}"
+    value="${value%"${value##*[![:space:]]}"}"
+    # Strip one matching pair of surrounding quotes.
+    if [[ "$value" =~ ^\"(.*)\"$ || "$value" =~ ^\'(.*)\'$ ]]; then
+      value="${BASH_REMATCH[1]}"
+    fi
+    [ -n "${!key+x}" ] && continue
+    export "$key=$value"
+  done < "$file"
+}
+
 __raumboard_load_instance() {
   local name="${RAUMBOARD_INSTANCE:-}"
   [ -n "$name" ] || return 0
@@ -39,24 +60,7 @@ __raumboard_load_instance() {
     return 1
   fi
 
-  # Read into the environment without letting the file win over an explicit
-  # override: collect what it sets, then export only the unset ones.
-  local key value
-  while IFS= read -r line || [ -n "$line" ]; do
-    [[ "$line" =~ ^[[:space:]]*(#|$) ]] && continue
-    [[ "$line" =~ ^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*=(.*)$ ]] || continue
-    key="${BASH_REMATCH[1]}"
-    value="${BASH_REMATCH[2]}"
-    value="${value#"${value%%[![:space:]]*}"}"
-    value="${value%"${value##*[![:space:]]}"}"
-    # Strip one matching pair of surrounding quotes.
-    if [[ "$value" =~ ^\"(.*)\"$ || "$value" =~ ^\'(.*)\'$ ]]; then
-      value="${BASH_REMATCH[1]}"
-    fi
-    [ -n "${!key+x}" ] && continue
-    export "$key=$value"
-  done < "$file"
-
+  raumboard_load_env_file "$file"
   echo "instance: $name ($file)" >&2
 }
 
