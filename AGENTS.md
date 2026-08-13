@@ -33,6 +33,14 @@ First rollout is a pilot primary school in NRW.
 - **Auth:** per school one admin login (email + password, Argon2, cookie session)
   for Verwaltung + one teacher PIN that unlocks class boards per device. Kids
   never log in. Onboarding/reset is manual by the operator in the early phase.
+  **The Verwaltung asks for the teacher PIN on every entry**, in front of the
+  admin session. Both cookies outlive a school day (board 180 days, admin 30) by
+  design, and the boards run on a whiteboard the children operate themselves, so
+  a persisted session alone would leave `#/admin` one tap away for a class. The
+  gate is component state in [`src/views/Admin.tsx`](src/views/Admin.tsx), not a
+  cookie: leaving the page locks it again. It guards the screen, not the data —
+  admin mutations still need `rb_admin` on the server, so the PIN adds a barrier
+  and replaces nothing.
 - **Data minimization:** first name + initial only, never full names.
 - **AVV/DSGVO:** hosting for schools makes the hosting operator an
   Auftragsverarbeiter even when free — AVV template + TOM doc required before the

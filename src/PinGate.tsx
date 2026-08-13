@@ -6,11 +6,25 @@ import { useMeta } from './useBoard'
 
 /**
  * Teacher PIN prompt — shown when a board interaction needs an unlocked
- * device (api mode without board cookie). Renders one slot per PIN digit
- * (length from the server) so it's clear how many digits are expected;
- * digits stay masked so the PIN isn't readable on a classroom whiteboard.
+ * device (api mode without board cookie), and every time the Verwaltung is
+ * entered. Renders one slot per PIN digit (length from the server) so it's
+ * clear how many digits are expected; digits stay masked so the PIN isn't
+ * readable on a classroom whiteboard.
+ *
+ * `onSuccess` and `onClose` differ where dismissing the gate has to do more
+ * than close a modal (the Verwaltung leaves the page).
  */
-export function PinGate({ onClose }: { onClose: () => void }) {
+export function PinGate({
+  onClose,
+  onSuccess = onClose,
+  title = 'Lehrkraft-PIN',
+  intro = 'Dieses Gerät ist noch gesperrt. Eine Lehrkraft gibt einmalig die PIN ein, danach kann hier gebucht werden.',
+}: {
+  onClose: () => void
+  onSuccess?: () => void
+  title?: string
+  intro?: string
+}) {
   const meta = useMeta()
   const length = meta.pinLength ?? null
   const inputRef = useRef<HTMLInputElement>(null)
@@ -26,7 +40,7 @@ export function PinGate({ onClose }: { onClose: () => void }) {
     setError(null)
     const result = await enterPin(value.trim())
     setBusy(false)
-    if (result.ok) onClose()
+    if (result.ok) onSuccess()
     else {
       setError(result.reason)
       setPin('')
@@ -44,11 +58,8 @@ export function PinGate({ onClose }: { onClose: () => void }) {
   const slots = length ? Array.from({ length }, (_, i) => i) : null
 
   return (
-    <Modal title="Lehrkraft-PIN" onClose={onClose}>
-      <p>
-        Dieses Gerät ist noch gesperrt. Eine Lehrkraft gibt einmalig die PIN ein, danach kann hier
-        gebucht werden.
-      </p>
+    <Modal title={title} onClose={onClose}>
+      <p>{intro}</p>
 
       {slots ? (
         <div className="pin-slots" onClick={() => inputRef.current?.focus()}>

@@ -8,7 +8,8 @@ import {
   removeKid, removeKlass, removeRoom, reseed, reset, updateKid, updateKlass, updateRoom,
 } from '../store'
 import { EmojiButton } from '../EmojiButton'
-import { Modal } from '../components'
+import { Modal, TopBar } from '../components'
+import { PinGate } from '../PinGate'
 import { useBoard, useMeta } from '../useBoard'
 
 // SheetJS is heavy and only needed for the (rare) admin import — load it on demand
@@ -134,6 +135,7 @@ export function Admin() {
   const state = useBoard()
   const meta = useMeta()
   const [modal, setModal] = useState<AdminModal>(null)
+  const [unlocked, setUnlocked] = useState(false)
   const [tab, setTab] = useState<TabKey>('raeume')
   const [importOpen, setImportOpen] = useState(false)
   const [roomName, setRoomName] = useState('')
@@ -145,6 +147,24 @@ export function Admin() {
   const [kidKlass, setKidKlass] = useState('')
   const [klassName, setKlassName] = useState('')
   const [klassEmoji, setKlassEmoji] = useState('🚪')
+
+  // The Verwaltung sits on the same whiteboard the children use all day, so the
+  // PIN is asked on *every* entry. It deliberately ignores both the device
+  // unlock and the admin session: those last months, a class does not.
+  // Component state, not a cookie — leaving the page locks it again.
+  if (meta.mode === 'api' && !unlocked)
+    return (
+      <main className="admin">
+        <TopBar title="Verwaltung" />
+        <PinGate
+          intro="Die Verwaltung ist nur für Lehrkräfte. Bitte die PIN eingeben."
+          onSuccess={() => setUnlocked(true)}
+          onClose={() => {
+            window.location.hash = '#/'
+          }}
+        />
+      </main>
+    )
 
   if (meta.mode === 'api' && !meta.isAdmin) return <Login />
 
