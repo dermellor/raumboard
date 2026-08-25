@@ -1,5 +1,6 @@
 import { Settings } from 'lucide-react'
 import { Seats } from '../components'
+import { DayEndReset } from '../DayEndReset'
 import { roomVars } from '../roomColor'
 import { occupancy } from '../store'
 import { useBoard, useMeta } from '../useBoard'
@@ -7,14 +8,12 @@ import { useBoard, useMeta } from '../useBoard'
 export function Home() {
   const state = useBoard()
   const meta = useMeta()
+  const anyAway = state.kids.some((k) => k.currentRoomId !== null)
 
   return (
     <main>
       <div className="topbar">
         <h1>🏫 {meta.mode === 'api' && meta.schoolName ? meta.schoolName : 'Raumboard'}</h1>
-        <a href="#/admin">
-          <Settings className="icon-soft" /> Verwaltung
-        </a>
       </div>
 
       <h2>Klassen</h2>
@@ -51,6 +50,15 @@ export function Home() {
             </div>
           </a>
         ))}
+      </div>
+
+      {/* what the adults use, below what the children tap all day */}
+      <div className="grown-ups">
+        {/* nothing to put back when every kid is in their classroom */}
+        {anyAway && <DayEndReset />}
+        <a href="#/admin">
+          <Settings className="icon-soft" /> Verwaltung
+        </a>
       </div>
     </main>
   )

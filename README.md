@@ -62,6 +62,9 @@ the login.
 
 Worth knowing:
 
+- „Alle zurück in die Klasse" at the foot of the start page asks for the PIN
+  again, even on a device that is already unlocked: it clears the occupancy of
+  the whole school, and the children operate that whiteboard themselves.
 - Changing the PIN requires the admin password.
 - Changing the PIN does not lock devices that are already unlocked. Use
   „Abmelden" on the device itself for that.

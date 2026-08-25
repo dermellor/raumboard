@@ -1,11 +1,11 @@
 import {
   Ban, Baby, CircleCheck, Database, Hash, KeyRound, LayoutGrid, LogOut, Plus,
-  RotateCcw, School, Settings, Sprout, Trash2, Upload, Users,
+  School, Settings, Sprout, Trash2, Upload, Users,
 } from 'lucide-react'
 import { lazy, Suspense, useState } from 'react'
 import {
   addKid, addKlass, addRoom, changePassword, changePin, logout, occupancy,
-  removeKid, removeKlass, removeRoom, reseed, reset, updateKid, updateKlass, updateRoom,
+  removeKid, removeKlass, removeRoom, reseed, updateKid, updateKlass, updateRoom,
 } from '../store'
 import { EmojiButton } from '../EmojiButton'
 import { Modal, TopBar } from '../components'
@@ -201,15 +201,10 @@ export function Admin() {
         <button onClick={() => setImportOpen(true)}>
           <Upload /> Kinder aus Excel/CSV importieren
         </button>
-        <hr className="section-rule" />
-        <button
-          className="danger"
-          onClick={() => {
-            if (confirm('Alle Kinder zurück in ihre Klassenzimmer buchen?')) reset()
-          }}
-        >
-          <RotateCcw /> Alle zurück in die Klasse (Reset)
-        </button>{' '}
+        {/* the Feierabend-Reset used to sit here, but it changes today's
+            occupancy, not the data this tab administers — it lives on the start
+            page now, where the teaching staff needs it daily. */}
+        {(meta.mode === 'demo' || meta.dev) && <hr className="section-rule" />}
         {meta.mode === 'demo' && (
           <button
             className="danger"

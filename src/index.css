@@ -284,6 +284,42 @@ button {
   font-weight: 600;
 }
 
+/* Verwaltung and Feierabend-Reset: what only the adults need, at the foot of the
+   start page and muted, so it doesn't compete with the tiles the children tap. */
+.grown-ups {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 2.5rem;
+  /* clears the fixed pills in the bottom corners (demo reset, dev lock) */
+  margin-bottom: 3rem;
+}
+
+/* direct children only: the PIN gate's modal renders inside this row (no portal),
+   and its own buttons must keep their own look */
+.grown-ups > a,
+.grown-ups > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 3rem;
+  padding: 0.5rem 1.1rem;
+  border-radius: 999px;
+  border: 2px solid var(--line);
+  background: var(--card);
+  color: var(--ink-soft);
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: var(--shadow);
+}
+
+.grown-ups > a svg,
+.grown-ups > button svg {
+  width: 1.1em;
+  height: 1.1em;
+}
+
 /* --- emoji picker ------------------------------------------------------------ */
 
 .emoji-btn {

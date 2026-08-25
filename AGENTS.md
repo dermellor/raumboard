@@ -82,6 +82,11 @@ Consequences worth knowing before touching this:
 - **The gate's PIN entry sets `rb_board` too**, since it posts to the same
   endpoint as the board gate. Opening the Verwaltung on a fresh whiteboard
   therefore unlocks that device for booking as well.
+- **The Feierabend-Reset re-asks for the PIN as well**, for the same reason and
+  by the same means ([`src/DayEndReset.tsx`](src/DayEndReset.tsx)). It wipes the
+  occupancy of the whole school and sits on the start page, so on an unlocked
+  whiteboard a confirm dialog would put it one tap and one „OK" away for a class.
+  The PIN entry *is* the confirmation there; no second dialog follows it.
 - **`POST /api/admin/change-pin` verifies the admin password**, not the current
   PIN: the login is the master key and the PIN is authority handed down from it.
 - **A new PIN cannot invalidate `rb_board`**, because the token is signed and
@@ -188,6 +193,13 @@ rollback of a failing migration.
 A kid can book into a room iff the room `isOpen`, has free capacity, and its
 `scope` is `'all'` or equals the kid's class. Booking out sets
 `currentRoomId = null`. Global reset ("Feierabend-Reset") sets every kid to `null`.
+
+The reset is a daily action of the teaching staff, not administration, so it sits
+at the foot of the start page next to „Verwaltung" rather than in the admin tabs:
+it changes today's occupancy, and the „Daten" tab is about the data (classes,
+kids, rooms). It only renders while at least one kid is out, because with everyone
+in their classroom there is nothing to put back. `POST /api/reset` matches that
+placement, needing only `canBook` and not an admin session.
 
 ## Ports
 
