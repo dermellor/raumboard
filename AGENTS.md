@@ -30,9 +30,10 @@ First rollout is a pilot primary school in NRW.
 - **Server:** a Linux VPS with a reverse proxy (wildcard or on-demand TLS for
   `*.raumboard.de`), Node/Hono, WebSockets for realtime, and per-school DB backups
   to object storage.
-- **Auth:** per school one admin login for Verwaltung plus one teacher PIN that
-  unlocks boards per device. Kids never log in. Onboarding and reset are manual
-  by the operator in the early phase. See „Auth: PIN and login" below.
+- **Auth:** per school one teacher PIN that unlocks boards per device and carries
+  the Verwaltung, plus one admin login for the Excel/CSV import. Kids never log
+  in. Onboarding and reset are manual by the operator in the early phase. See
+  „Auth: PIN and login" below.
 - **Data minimization:** first name + initial only, never full names.
 - **AVV/DSGVO:** hosting for schools makes the hosting operator an
   Auftragsverarbeiter even when free — AVV template + TOM doc required before the
@@ -57,28 +58,51 @@ cookies (no session store), and neither can stand in for the other.
 | Secret | 4 to 8 digits (6 when generated), `pin_hash` | email + password, `admin_email` / `admin_hash` |
 | Endpoint | `POST /api/pin` | `POST /api/login` |
 | Cookie / TTL | `rb_board`, 180 days | `rb_admin`, 30 days |
-| Unlocks | `/api/book`, `/api/unbook`, `/api/reset` | everything under `/api/admin/*` |
+| Unlocks | `/api/book`, `/api/unbook`, `/api/reset` and the Verwaltung: `/api/rooms`, `/api/kids`, `/api/klasses`, `/api/verify-password`, `/api/change-password`, `/api/change-pin` | everything under `/api/admin/*`, which is `POST /api/admin/import` and nothing else |
 
-The server derives `canBook = isAdmin || hasBoard` ([`server/index.ts`](server/index.ts)),
+**The dividing line is bulk.** The import is the one mutation that brings personal
+data in from outside and can replace the whole school's data in a single step
+(`mode: 'replace'`), and it happens about once a year, at the start of the school
+year, with the responsible person sitting in front of the list. Everything else in
+the Verwaltung is single-record editing: one room, one class, one child, visible
+and individually repairable. So `/api/admin/` as a path prefix means „needs the
+login", and the CRUD routes live one level up without it.
+
+The server derives `canOperate = isAdmin || hasBoard` ([`server/index.ts`](server/index.ts)),
 which is the whole interplay:
 
-| Cookies held | Book on a board | Enter Verwaltung | Change data |
+| Cookies held | Book on a board | Verwaltung: rooms, classes, kids | Import and Zugangsdaten |
 | --- | --- | --- | --- |
-| PIN only | yes | screen yes, then the login form | no |
-| login only | yes | no, the PIN is asked first | yes |
-| both | yes | yes | yes |
+| PIN only | yes | yes | the password opens the screen; the import itself still needs the login |
+| login only | yes | API yes, but the screen asks for the PIN first | yes, after the password |
+| both | yes | yes | yes, after the password |
 
 Consequences worth knowing before touching this:
 
-- **The Verwaltung asks for the PIN on every entry**, in front of the admin
-  session, and an admin session does not skip it. The boards run on a whiteboard
-  the children operate themselves and both cookies outlive a school day by
-  design, so a persisted session alone would leave `#/admin` one tap away for a
-  class. The gate is component state in
+- **The Verwaltung asks for the PIN on every entry**, and an admin session does
+  not skip it. The boards run on a whiteboard the children operate themselves and
+  both cookies outlive a school day by design, so nothing persisted may leave
+  `#/admin` one tap away for a class. The gate is component state in
   [`src/views/Admin.tsx`](src/views/Admin.tsx), not a cookie: switching tabs
   inside the page keeps it open, leaving or reloading the page locks it again.
-- **It guards the screen, not the data.** Admin mutations still need `rb_admin`
-  on the server, so the PIN adds a barrier and replaces nothing.
+- **„Kinder importieren" and „Zugangsdaten" ask for the school's password before
+  they open**, by the same means and for the same reason: one brings personal data
+  in from outside, the other holds the keys to the school, and a 30-day session
+  cookie may not be what opens either. `PASSWORD_TABS` in
+  [`src/views/Admin.tsx`](src/views/Admin.tsx) names them, the prompt is
+  [`src/PasswordGate.tsx`](src/PasswordGate.tsx), and one confirmation covers both
+  tabs until the page is left.
+- **The confirmed password is handed to the credential forms**, so „Passwort
+  ändern" asks for the new password only and „Lehrkraft-PIN ändern" for the new
+  PIN. The server still requires the current password in the body; the gate has
+  it, and asking twice for one secret is what made the old login-in-front feel
+  pointless.
+- **Signing in and out of the account happens on the start page**, next to
+  „Verwaltung" ([`src/views/Home.tsx`](src/views/Home.tsx)). The same
+  `PasswordGate` serves both jobs: with a session it verifies the password, and
+  without one it asks for the email too and signs in, since a session that does
+  not exist yet cannot be confirmed. Opening a protected tab while signed out
+  therefore signs in and opens it in one step.
 - **The gate's PIN entry sets `rb_board` too**, since it posts to the same
   endpoint as the board gate. Opening the Verwaltung on a fresh whiteboard
   therefore unlocks that device for booking as well.
@@ -87,13 +111,31 @@ Consequences worth knowing before touching this:
   occupancy of the whole school and sits on the start page, so on an unlocked
   whiteboard a confirm dialog would put it one tap and one „OK" away for a class.
   The PIN entry *is* the confirmation there; no second dialog follows it.
-- **`POST /api/admin/change-pin` verifies the admin password**, not the current
-  PIN: the login is the master key and the PIN is authority handed down from it.
+- **Deleting a class is the one PIN-level deletion that takes children with it**,
+  so its confirm names their number instead of saying „samt allen Kindern".
+- **`POST /api/change-pin`, `/api/change-password` and `/api/verify-password` all
+  check the admin password in the body**, which is why they sit on the PIN level:
+  the password is the proof, and a login in front of them would ask for the same
+  secret twice. The PIN cannot promote itself that way, since changing it needs
+  the password. `verify-password` answers the question and changes nothing: no
+  cookie, no config write. The price is that password guessing is reachable with
+  the PIN, so all three share one throttle: five failures per board per 15
+  minutes, in memory, cleared on success.
+- **`POST /api/logout` ends the admin session only, `POST /api/lock` drops both
+  cookies.** „Abmelden" on the start page must not lock the whiteboard a class
+  books on. „Dieses Gerät sperren" in the Zugangsdaten tab is the `lock` call.
 - **A new PIN cannot invalidate `rb_board`**, because the token is signed and
   carries an expiry with no reference to the PIN hash. That is deliberate, since
   the alternative locks every whiteboard in the school mid-year. Revoking one
-  device means `POST /api/logout` from it (which clears both cookies), so a
-  „reset all devices" feature would need a tenant-wide token epoch first.
+  device means `POST /api/lock` from it, so a „reset all devices" feature would
+  need a tenant-wide token epoch first.
+
+[`server/access.test.ts`](server/access.test.ts) drives the whole matrix through
+the real app: no cookie changes nothing, the PIN opens the Verwaltung and is
+refused by the import, the password check that changes nothing, the credential
+endpoints and their shared throttle, and which cookie each sign-off clears. It
+imports `app` from `server/index.ts` with
+`RAUMBOARD_NO_LISTEN=1`, which is what stops that import from binding a port.
 
 Provisioning and recovery live in [`server/cli.ts`](server/cli.ts) and print the
 secrets to stdout only.
@@ -194,12 +236,12 @@ A kid can book into a room iff the room `isOpen`, has free capacity, and its
 `scope` is `'all'` or equals the kid's class. Booking out sets
 `currentRoomId = null`. Global reset ("Feierabend-Reset") sets every kid to `null`.
 
-The reset is a daily action of the teaching staff, not administration, so it sits
-at the foot of the start page next to „Verwaltung" rather than in the admin tabs:
-it changes today's occupancy, and the „Daten" tab is about the data (classes,
-kids, rooms). It only renders while at least one kid is out, because with everyone
-in their classroom there is nothing to put back. `POST /api/reset` matches that
-placement, needing only `canBook` and not an admin session.
+The reset is a daily action of the teaching staff, so it sits at the foot of the
+start page next to „Verwaltung" rather than inside it: it changes today's
+occupancy, while the Verwaltung is about rooms, classes and kids. It only renders
+while at least one kid is out, because with everyone in their classroom there is
+nothing to put back. `POST /api/reset` matches that placement, needing only
+`canOperate`.
 
 ## Ports
 
@@ -354,3 +396,38 @@ A Docker/Compose self-hosting path is the Phase-4 goal.
 Operator-specific notes for the maintainer's own hosted instance (server layout,
 where the CLI writes the credentials it printed, backup migration steps) live in
 `DEPLOY.local.md`, which is untracked by design.
+
+**A deploy does not publish anything.** It rsyncs a locally built tree to the
+server over SSH; the public repo is a separate step and a separate history.
+
+## Publishing to the public repo
+
+The public repo has **no common ancestor** with the development history, and
+must not get one. Development commits from before 2026-08-02 carry the pilot
+school's name and slug, a handover mail naming a school's head with their work
+address, and the operator's server alias. Those were removed from the tree,
+which leaves them in the commits: pushing the development branch would publish
+all of it. The current tree is clean, so publishing copies the **tree**, never
+the history.
+
+[`scripts/publish.sh`](scripts/publish.sh) does that, and pushes nothing:
+
+```bash
+bash scripts/publish.sh --dry-run    # what would be published
+bash scripts/publish.sh              # one commit on `publish`, then stops
+git push public publish:main         # your call, separately
+```
+
+It reads the tree of a **ref** rather than the working directory, so an
+unrelated work-in-progress in the checkout cannot end up in a release, and it
+writes one commit on `publish` whose parent is the previously published one.
+
+- **It refuses on the pattern list**, `~/.config/raumboard/publish-guard.txt`
+  (one case-insensitive regex per line), and refuses just as hard when that file
+  is missing: no check must ever look like a passed check. The list names the
+  private things, so it lives outside the repo like an instance profile.
+- **The published commit records its source** as a `Raumboard-source:` trailer.
+  That is how the next run knows the range to summarize, so the public repo
+  carries its own bookkeeping and no state lives beside git.
+- **An identical tree is a no-op**, and `git update-ref refs/heads/publish <old>`
+  undoes a release that has not been pushed yet.
