@@ -504,9 +504,99 @@ h1 {
   font: inherit;
 }
 
-.radio {
-  min-width: 0 !important;
-  font-weight: 400 !important;
+/* import mode: two selectable cards, so the destructive one is readable at a glance */
+.mode-choice {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+  margin: 0.75rem 0 0.25rem;
+}
+
+/* Each card carries its own accent: green adds, red deletes. Own class names,
+   not the shared .danger, since `.admin .danger` would paint the unselected
+   card red too (the wizard lives inside the admin page). */
+.mode-option {
+  --accent: var(--ink);
+  --tint: var(--card);
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.7rem 0.85rem;
+  border: 2px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  cursor: pointer;
+  line-height: 1.35;
+}
+
+.mode-append {
+  --accent: #16a34a;
+  --tint: #f2fbf4;
+}
+
+.mode-replace {
+  --accent: #dc2626;
+  --tint: #fdf3f2;
+}
+
+.mode-option:hover {
+  border-color: var(--accent);
+}
+
+.mode-option.selected {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+  background: var(--tint);
+}
+
+.mode-option.selected strong {
+  color: var(--accent);
+}
+
+/* the native radio only carries keyboard focus and semantics; the card is the control */
+.mode-option input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  clip-path: inset(50%);
+}
+
+.mode-option:has(input:focus-visible) {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.mode-option svg {
+  flex: none;
+  width: 1.4rem;
+  height: 1.4rem;
+  margin-top: 0.1rem;
+  color: var(--accent);
+}
+
+/* the unchosen option keeps its hue but steps back */
+.mode-option:not(.selected) svg {
+  opacity: 0.45;
+}
+
+.mode-option span {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+.mode-option strong {
+  display: block;
+  font-size: 1rem;
+  color: var(--ink);
+}
+
+@media (max-width: 30rem) {
+  .mode-choice {
+    grid-template-columns: 1fr;
+  }
 }
 
 .preview-scroll {

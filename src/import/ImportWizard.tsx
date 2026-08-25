@@ -1,4 +1,4 @@
-import { FileUp, Upload } from 'lucide-react'
+import { Eraser, FileUp, Upload, UserPlus } from 'lucide-react'
 import { useMemo, useRef, useState } from 'react'
 import { Modal } from '../components'
 import { importKids } from '../store'
@@ -131,6 +131,35 @@ export function ImportWizard({ onClose }: { onClose: () => void }) {
             <FileUp /> {fileName} · {table.rows.length} Datenzeilen
           </p>
 
+          <div className="mode-choice">
+            <label className={`mode-option mode-append${mode === 'append' ? ' selected' : ''}`}>
+              <input
+                type="radio"
+                name="import-mode"
+                checked={mode === 'append'}
+                onChange={() => setMode('append')}
+              />
+              <UserPlus />
+              <span>
+                <strong>Hinzufügen</strong>
+                Bestehende Kinder bleiben, die Liste kommt dazu.
+              </span>
+            </label>
+            <label className={`mode-option mode-replace${mode === 'replace' ? ' selected' : ''}`}>
+              <input
+                type="radio"
+                name="import-mode"
+                checked={mode === 'replace'}
+                onChange={() => setMode('replace')}
+              />
+              <Eraser />
+              <span>
+                <strong>Klassen ersetzen</strong>
+                Kinder der betroffenen Klassen werden vorher gelöscht.
+              </span>
+            </label>
+          </div>
+
           {matrix && matrix.length > 1 && (
             <div className="field">
               <label htmlFor="imp-header">Kopfzeile</label>
@@ -202,26 +231,6 @@ export function ImportWizard({ onClose }: { onClose: () => void }) {
               />
             </div>
           )}
-
-          <div className="field">
-            <label>Modus</label>
-            <label className="radio">
-              <input
-                type="radio"
-                checked={mode === 'append'}
-                onChange={() => setMode('append')}
-              />{' '}
-              hinzufügen
-            </label>
-            <label className="radio">
-              <input
-                type="radio"
-                checked={mode === 'replace'}
-                onChange={() => setMode('replace')}
-              />{' '}
-              Klasse(n) vorher leeren
-            </label>
-          </div>
 
           <h3>Vorschau ({validCount} Kinder)</h3>
           <div className="preview-scroll">
