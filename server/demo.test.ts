@@ -43,7 +43,7 @@ test('a session id round-trips into a board id, and only a real one is accepted'
   assert.equal(isSession('kurz'), false)
   assert.equal(isSession(undefined), false)
   // a school slug is not a demo board
-  assert.equal(isDemoBoard('beispielschule'), false)
+  assert.equal(isDemoBoard('lindenschule'), false)
 })
 
 test('two visitors get separate boards, and nothing reaches the disk', () => {
@@ -153,7 +153,7 @@ test('the server refuses a demo slug that self-hosted mode would shadow', () => 
           ...process.env,
           RAUMBOARD_DATA: mkdtempSync(path.join(tmpdir(), 'lb-demo-solo-')),
           RAUMBOARD_DEMO_TENANT: 'demo',
-          RAUMBOARD_DEFAULT_TENANT: 'beispielschule',
+          RAUMBOARD_DEFAULT_TENANT: 'lindenschule',
         },
         stdio: 'pipe',
       }),
