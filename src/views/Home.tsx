@@ -1,13 +1,16 @@
-import { Settings } from 'lucide-react'
+import { LogIn, LogOut, Settings } from 'lucide-react'
+import { useState } from 'react'
 import { Seats } from '../components'
 import { DayEndReset } from '../DayEndReset'
+import { PasswordGate } from '../PasswordGate'
 import { roomVars } from '../roomColor'
-import { occupancy } from '../store'
+import { logout, occupancy } from '../store'
 import { useBoard, useMeta } from '../useBoard'
 
 export function Home() {
   const state = useBoard()
   const meta = useMeta()
+  const [gate, setGate] = useState(false)
   const anyAway = state.kids.some((k) => k.currentRoomId !== null)
 
   return (
@@ -59,7 +62,26 @@ export function Home() {
         <a href="#/admin">
           <Settings className="icon-soft" /> Verwaltung
         </a>
+        {/* the school's account: needed for the import and for the credentials,
+            so it is signed in and out here rather than inside the Verwaltung */}
+        {meta.mode === 'api' &&
+          (meta.isAdmin ? (
+            <button onClick={() => void logout()}>
+              <LogOut className="icon-soft" /> Abmelden
+            </button>
+          ) : (
+            <button onClick={() => setGate(true)}>
+              <LogIn className="icon-soft" /> Anmelden
+            </button>
+          ))}
       </div>
+
+      {gate && (
+        <PasswordGate
+          onSuccess={() => setGate(false)}
+          onClose={() => setGate(false)}
+        />
+      )}
     </main>
   )
 }

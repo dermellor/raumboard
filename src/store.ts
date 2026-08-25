@@ -39,6 +39,7 @@ export const {
   login,
   logout,
   enterPin,
+  verifyPassword,
   changePassword,
   changePin,
   lockDevice,

@@ -51,7 +51,7 @@ export function RaumSicht({ roomId }: { roomId: string }) {
                       className="tile"
                       aria-pressed={k.id === selectedKidId}
                       onClick={() => {
-                        if (!meta.canBook) return setShowPin(true)
+                        if (!meta.canOperate) return setShowPin(true)
                         setSelectedKidId(k.id === selectedKidId ? null : k.id)
                       }}
                     >

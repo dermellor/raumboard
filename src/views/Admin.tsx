@@ -1,23 +1,23 @@
 import {
-  Ban, Baby, CircleCheck, Database, Hash, KeyRound, LayoutGrid, LogOut, Plus,
+  Ban, Baby, CircleCheck, FileUp, Hash, KeyRound, LayoutGrid, Lock, Plus,
   School, Settings, Sprout, Trash2, Upload, Users,
 } from 'lucide-react'
 import { lazy, Suspense, useState } from 'react'
 import {
-  addKid, addKlass, addRoom, changePassword, changePin, logout, occupancy,
+  addKid, addKlass, addRoom, changePassword, changePin, lockDevice, occupancy,
   removeKid, removeKlass, removeRoom, reseed, updateKid, updateKlass, updateRoom,
 } from '../store'
 import { EmojiButton } from '../EmojiButton'
 import { Modal, TopBar } from '../components'
+import { PasswordGate } from '../PasswordGate'
 import { PinGate } from '../PinGate'
 import { useBoard, useMeta } from '../useBoard'
 
-// SheetJS is heavy and only needed for the (rare) admin import — load it on demand
+// SheetJS is heavy and only needed for the (rare) import — load it on demand
 // so the boards running all day on whiteboards stay light.
 const ImportWizard = lazy(() =>
   import('../import/ImportWizard').then((m) => ({ default: m.ImportWizard })),
 )
-import { Login } from './Login'
 
 type AdminModal = 'room' | 'klass' | 'kid' | null
 
@@ -25,14 +25,24 @@ const TABS = [
   { key: 'raeume', label: 'Räume', icon: <LayoutGrid /> },
   { key: 'klassen', label: 'Klassen', icon: <Users /> },
   { key: 'kinder', label: 'Kinder', icon: <Baby /> },
-  { key: 'daten', label: 'Daten', icon: <Database /> },
+  { key: 'import', label: 'Kinder importieren', icon: <Upload /> },
   { key: 'zugang', label: 'Zugangsdaten', icon: <KeyRound /> },
 ] as const
 type TabKey = (typeof TABS)[number]['key']
 
-function CredentialsSection() {
+/**
+ * The two tabs that ask for the school's password before they open: one brings
+ * personal data in from outside, the other holds the keys to the whole school.
+ * The teacher PIN in front of the page is not enough for either.
+ */
+const PASSWORD_TABS: TabKey[] = ['import', 'zugang']
+
+/**
+ * `password` is the one the gate in front of this tab has just confirmed, so
+ * neither form asks for it again — the server still requires it in the body.
+ */
+function CredentialsSection({ password }: { password: string }) {
   const [modal, setModal] = useState<'password' | 'pin' | null>(null)
-  const [current, setCurrent] = useState('')
   const [next, setNext] = useState('')
   const [repeat, setRepeat] = useState('')
   const [pin, setPin] = useState('')
@@ -41,7 +51,6 @@ function CredentialsSection() {
 
   const close = () => {
     setModal(null)
-    setCurrent('')
     setNext('')
     setRepeat('')
     setPin('')
@@ -51,7 +60,7 @@ function CredentialsSection() {
   const submitPassword = async () => {
     if (next.length < 10) return setError('Neues Passwort braucht mindestens 10 Zeichen.')
     if (next !== repeat) return setError('Die Wiederholung stimmt nicht überein.')
-    const result = await changePassword(current, next)
+    const result = await changePassword(password, next)
     if (!result.ok) return setError(result.reason)
     close()
     setNotice('Passwort geändert.')
@@ -59,7 +68,7 @@ function CredentialsSection() {
 
   const submitPin = async () => {
     if (!/^\d{4,8}$/.test(pin.trim())) return setError('Die PIN muss aus 4–8 Ziffern bestehen.')
-    const result = await changePin(current, pin.trim())
+    const result = await changePin(password, pin.trim())
     if (!result.ok) return setError(result.reason)
     close()
     setNotice('Lehrkraft-PIN geändert. Bereits entsperrte Geräte bleiben entsperrt.')
@@ -75,19 +84,25 @@ function CredentialsSection() {
       </button>
       {notice && <p className="count">{notice}</p>}
 
+      {/* the one way to revoke this device: the signed board cookie cannot be
+          invalidated from elsewhere, so it has to be dropped here */}
+      <hr className="section-rule" />
+      <button
+        onClick={() => {
+          if (!confirm('Dieses Gerät sperren? Danach wird hier wieder die Lehrkraft-PIN gebraucht.')) return
+          void lockDevice()
+          window.location.hash = '#/'
+        }}
+      >
+        <Lock /> Dieses Gerät sperren
+      </button>
+
       {modal === 'password' && (
         <Modal title="Passwort ändern" onClose={close}>
           <div className="field">
-            <label htmlFor="cred-current">Aktuelles Passwort</label>
-            <input
-              id="cred-current" type="password" autoFocus autoComplete="current-password"
-              value={current} onChange={(e) => setCurrent(e.target.value)}
-            />
-          </div>
-          <div className="field">
             <label htmlFor="cred-next">Neues Passwort</label>
             <input
-              id="cred-next" type="password" autoComplete="new-password"
+              id="cred-next" type="password" autoFocus autoComplete="new-password"
               value={next} onChange={(e) => setNext(e.target.value)}
             />
           </div>
@@ -99,7 +114,7 @@ function CredentialsSection() {
             />
           </div>
           {error && <p className="form-error">{error}</p>}
-          <button disabled={!current || !next || !repeat} onClick={() => void submitPassword()}>
+          <button disabled={!next || !repeat} onClick={() => void submitPassword()}>
             speichern
           </button>
         </Modal>
@@ -108,21 +123,14 @@ function CredentialsSection() {
       {modal === 'pin' && (
         <Modal title="Lehrkraft-PIN ändern" onClose={close}>
           <div className="field">
-            <label htmlFor="cred-pw">Admin-Passwort</label>
-            <input
-              id="cred-pw" type="password" autoFocus autoComplete="current-password"
-              value={current} onChange={(e) => setCurrent(e.target.value)}
-            />
-          </div>
-          <div className="field">
             <label htmlFor="cred-pin">Neue PIN</label>
             <input
-              id="cred-pin" inputMode="numeric" pattern="[0-9]*" placeholder="4–8 Ziffern"
+              id="cred-pin" inputMode="numeric" pattern="[0-9]*" placeholder="4–8 Ziffern" autoFocus
               value={pin} onChange={(e) => setPin(e.target.value)}
             />
           </div>
           {error && <p className="form-error">{error}</p>}
-          <button disabled={!current || !pin} onClick={() => void submitPin()}>
+          <button disabled={!pin} onClick={() => void submitPin()}>
             speichern
           </button>
         </Modal>
@@ -136,6 +144,10 @@ export function Admin() {
   const meta = useMeta()
   const [modal, setModal] = useState<AdminModal>(null)
   const [unlocked, setUnlocked] = useState(false)
+  // the school's password once the gate confirmed it, so the credential forms
+  // can send it without asking a second time; null means not confirmed yet
+  const [confirmed, setConfirmed] = useState<string | null>(null)
+  const [pending, setPending] = useState<TabKey | null>(null)
   const [tab, setTab] = useState<TabKey>('raeume')
   const [importOpen, setImportOpen] = useState(false)
   const [roomName, setRoomName] = useState('')
@@ -148,10 +160,10 @@ export function Admin() {
   const [klassName, setKlassName] = useState('')
   const [klassEmoji, setKlassEmoji] = useState('🚪')
 
-  // The Verwaltung sits on the same whiteboard the children use all day, so the
-  // PIN is asked on *every* entry. It deliberately ignores both the device
-  // unlock and the admin session: those last months, a class does not.
-  // Component state, not a cookie — leaving the page locks it again.
+  // The teacher PIN is the key to the whole Verwaltung, and it is asked on
+  // *every* entry: the device unlock lasts months, a class does not. Component
+  // state, not a cookie — leaving the page locks it again. The two tabs in
+  // PASSWORD_TABS ask for the school's password on top of it, the same way.
   if (meta.mode === 'api' && !unlocked)
     return (
       <main className="admin">
@@ -166,7 +178,9 @@ export function Admin() {
       </main>
     )
 
-  if (meta.mode === 'api' && !meta.isAdmin) return <Login />
+  // the password is asked once per visit to the page, for both protected tabs
+  const locked = (key: TabKey) =>
+    meta.mode === 'api' && PASSWORD_TABS.includes(key) && confirmed === null
 
   return (
     <main className="admin">
@@ -177,11 +191,6 @@ export function Admin() {
         <h1>
           <Settings className="icon-h1" /> Verwaltung
         </h1>
-        {meta.mode === 'api' && (
-          <button className="logout" onClick={() => void logout()}>
-            <LogOut /> Abmelden
-          </button>
-        )}
       </div>
 
       <nav className="tabbar">
@@ -189,17 +198,30 @@ export function Admin() {
           <button
             key={t.key}
             className={tab === t.key ? 'active' : undefined}
-            onClick={() => setTab(t.key)}
+            onClick={() => (locked(t.key) ? setPending(t.key) : setTab(t.key))}
           >
             {t.icon} {t.label}
+            {/* the lock disappears for both tabs once the password is confirmed */}
+            {locked(t.key) && <Lock className="icon-soft" />}
           </button>
         ))}
       </nav>
 
-      {tab === 'daten' && (
+      {pending && (
+        <PasswordGate
+          onSuccess={(password) => {
+            setConfirmed(password)
+            setTab(pending)
+            setPending(null)
+          }}
+          onClose={() => setPending(null)}
+        />
+      )}
+
+      {tab === 'import' && (
       <section>
         <button onClick={() => setImportOpen(true)}>
-          <Upload /> Kinder aus Excel/CSV importieren
+          <FileUp /> Kinder aus Excel/CSV importieren
         </button>
         {/* the Feierabend-Reset used to sit here, but it changes today's
             occupancy, not the data this tab administers — it lives on the start
@@ -234,7 +256,7 @@ export function Admin() {
       </section>
       )}
 
-      {tab === 'zugang' && meta.mode === 'api' && <CredentialsSection />}
+      {tab === 'zugang' && meta.mode === 'api' && <CredentialsSection password={confirmed ?? ''} />}
 
       {tab === 'raeume' && (
       <section>
@@ -317,7 +339,9 @@ export function Admin() {
             </tr>
           </thead>
           <tbody>
-            {state.klasses.map((c) => (
+            {state.klasses.map((c) => {
+              const kidCount = state.kids.filter((k) => k.klassId === c.id).length
+              return (
               <tr key={c.id}>
                 <td>
                   <EmojiButton
@@ -327,13 +351,19 @@ export function Admin() {
                   />{' '}
                   Klasse {c.name}
                 </td>
-                <td>{state.kids.filter((k) => k.klassId === c.id).length}</td>
+                <td>{kidCount}</td>
                 <td className="td-right">
                   <button
                     className="add danger"
                     aria-label={`Klasse ${c.name} löschen`}
                     onClick={() => {
-                      if (confirm(`Klasse ${c.name} samt allen Kindern und klassengebundenen Räumen löschen?`))
+                      // the number is in the question because this is the one
+                      // deletion on the PIN level that takes children with it
+                      if (
+                        confirm(
+                          `Klasse ${c.name} samt ${kidCount} ${kidCount === 1 ? 'Kind' : 'Kindern'} und klassengebundenen Räumen löschen?`,
+                        )
+                      )
                         removeKlass(c.id)
                     }}
                   >
@@ -341,7 +371,8 @@ export function Admin() {
                   </button>
                 </td>
               </tr>
-            ))}
+              )
+            })}
           </tbody>
         </table>
       </section>

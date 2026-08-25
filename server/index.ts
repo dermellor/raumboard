@@ -60,7 +60,7 @@ const BOARD_TTL = 180 * 24 * 3600
  * this string, which is what keeps two demo visitors apart.
  */
 type Env = { Variables: { boardId: string } }
-const app = new Hono<Env>()
+export const app = new Hono<Env>()
 
 const DEMO_COOKIE = 'rb_demo'
 const DEMO_TTL = 12 * 3600
@@ -79,10 +79,15 @@ app.get('/ask', (c) => {
 
 // --- helpers -----------------------------------------------------------------
 
+/**
+ * `canOperate` is the teacher level: today's bookings *and* the Verwaltung
+ * (rooms, classes, kids, credential changes). `isAdmin` is only needed where
+ * data arrives in bulk, which is the Excel/CSV import.
+ */
 function authInfo(c: any, boardId: string) {
   const isAdmin = verifyToken(getCookie(c, 'rb_admin'), boardId, 'admin')
   const hasBoard = verifyToken(getCookie(c, 'rb_board'), boardId, 'board')
-  return { isAdmin, canBook: isAdmin || hasBoard }
+  return { isAdmin, canOperate: isAdmin || hasBoard }
 }
 
 function openBoard(boardId: string) {
@@ -129,14 +134,14 @@ api.use('*', async (c, next) => {
 api.get('/state', (c) => {
   const boardId = c.get('boardId')
   const db = openBoard(boardId)
-  const { isAdmin, canBook } = authInfo(c, boardId)
+  const { isAdmin, canOperate } = authInfo(c, boardId)
   return c.json({
     state: board.loadState(db),
     meta: {
       mode: 'api',
       schoolName: board.getConfig(db, 'school_name') ?? boardId,
       isAdmin,
-      canBook,
+      canOperate,
       dev: DEV,
       // throwaway demo board: nothing is stored, so the UI may offer a reset
       ephemeral: isDemoBoard(boardId),
@@ -165,7 +170,17 @@ api.post('/login', async (c) => {
   return c.json({ ok: true })
 })
 
+/**
+ * Ends the admin session only. The device unlock survives on purpose: signing
+ * off after an import must not lock the whiteboard the class books on.
+ */
 api.post('/logout', (c) => {
+  deleteCookie(c, 'rb_admin', { path: '/' })
+  return c.json({ ok: true })
+})
+
+/** Locks this device again: both cookies go, the PIN is asked for next time. */
+api.post('/lock', (c) => {
   deleteCookie(c, 'rb_admin', { path: '/' })
   deleteCookie(c, 'rb_board', { path: '/' })
   return c.json({ ok: true })
@@ -182,12 +197,20 @@ api.post('/pin', async (c) => {
   return c.json({ ok: true })
 })
 
-/** Booking mutations need an unlocked board (teacher PIN) or admin. */
-api.use('/book', boardGuard)
-api.use('/unbook', boardGuard)
-api.use('/reset', boardGuard)
+/**
+ * Everything the teacher PIN unlocks: today's bookings and the Verwaltung.
+ * Collection and item paths are listed separately because `/rooms/*` does not
+ * match a POST to `/rooms` itself.
+ */
+const BOARD_PATHS = [
+  '/book', '/unbook', '/reset',
+  '/rooms', '/rooms/*', '/kids', '/kids/*', '/klasses', '/klasses/*',
+  '/verify-password', '/change-password', '/change-pin',
+]
+for (const p of BOARD_PATHS) api.use(p, boardGuard)
+
 async function boardGuard(c: any, next: () => Promise<void>) {
-  if (!authInfo(c, c.get('boardId')).canBook) return c.json({ error: 'locked' }, 401)
+  if (!authInfo(c, c.get('boardId')).canOperate) return c.json({ error: 'locked' }, 401)
   await next()
 }
 
@@ -232,7 +255,11 @@ api.post('/reseed', (c) => {
   return c.json({ ok: true })
 })
 
-/** Admin CRUD. */
+/**
+ * The account level, and the import is all of it. It is the one mutation that
+ * carries personal data in from outside and can replace the whole school's data
+ * in a single step, so the `/admin/` prefix means exactly „needs the login".
+ */
 api.use('/admin/*', async (c, next) => {
   if (!authInfo(c, c.get('boardId')).isAdmin) return c.json({ error: 'admin required' }, 401)
   await next()
@@ -255,7 +282,8 @@ api.post('/admin/import', async (c) => {
   return c.json({ ok: true, ...result })
 })
 
-api.post('/admin/rooms', async (c) => {
+/** Verwaltung CRUD — teacher level (see BOARD_PATHS). */
+api.post('/rooms', async (c) => {
   const { name, emoji, capacity, scope } = await c.req.json()
   if (!name?.trim()) return c.json({ error: 'name fehlt' }, 400)
   board.addRoom(openBoard(c.get('boardId')), name.trim(), emoji || '🚪', Number(capacity) || 0, scope || 'all')
@@ -263,19 +291,19 @@ api.post('/admin/rooms', async (c) => {
   return c.json({ ok: true })
 })
 
-api.patch('/admin/rooms/:id', async (c) => {
+api.patch('/rooms/:id', async (c) => {
   board.updateRoom(openBoard(c.get('boardId')), c.req.param('id'), await c.req.json())
   broadcast(c.get('boardId'), stateMessage(c.get('boardId')))
   return c.json({ ok: true })
 })
 
-api.delete('/admin/rooms/:id', (c) => {
+api.delete('/rooms/:id', (c) => {
   board.removeRoom(openBoard(c.get('boardId')), c.req.param('id'))
   broadcast(c.get('boardId'), stateMessage(c.get('boardId')))
   return c.json({ ok: true })
 })
 
-api.post('/admin/kids', async (c) => {
+api.post('/kids', async (c) => {
   const { klassId, symbol, name } = await c.req.json()
   if (!name?.trim() || !klassId) return c.json({ error: 'name/klassId fehlt' }, 400)
   board.addKid(openBoard(c.get('boardId')), klassId, symbol || '⭐', name.trim())
@@ -283,19 +311,19 @@ api.post('/admin/kids', async (c) => {
   return c.json({ ok: true })
 })
 
-api.patch('/admin/kids/:id', async (c) => {
+api.patch('/kids/:id', async (c) => {
   board.updateKid(openBoard(c.get('boardId')), c.req.param('id'), await c.req.json())
   broadcast(c.get('boardId'), stateMessage(c.get('boardId')))
   return c.json({ ok: true })
 })
 
-api.delete('/admin/kids/:id', (c) => {
+api.delete('/kids/:id', (c) => {
   board.removeKid(openBoard(c.get('boardId')), c.req.param('id'))
   broadcast(c.get('boardId'), stateMessage(c.get('boardId')))
   return c.json({ ok: true })
 })
 
-api.post('/admin/klasses', async (c) => {
+api.post('/klasses', async (c) => {
   const { name, emoji } = await c.req.json()
   if (!name?.trim()) return c.json({ error: 'name fehlt' }, 400)
   board.addKlass(openBoard(c.get('boardId')), name.trim(), emoji || undefined)
@@ -303,41 +331,96 @@ api.post('/admin/klasses', async (c) => {
   return c.json({ ok: true })
 })
 
-api.patch('/admin/klasses/:id', async (c) => {
+api.patch('/klasses/:id', async (c) => {
   board.updateKlass(openBoard(c.get('boardId')), c.req.param('id'), await c.req.json())
   broadcast(c.get('boardId'), stateMessage(c.get('boardId')))
   return c.json({ ok: true })
 })
 
-api.delete('/admin/klasses/:id', (c) => {
+api.delete('/klasses/:id', (c) => {
   board.removeKlass(openBoard(c.get('boardId')), c.req.param('id'))
   broadcast(c.get('boardId'), stateMessage(c.get('boardId')))
   return c.json({ ok: true })
 })
 
-/** Credentials self-service — both re-verify the current admin password. */
-api.post('/admin/change-password', async (c) => {
-  const db = openBoard(c.get('boardId'))
-  const { current, next } = await c.req.json<{ current?: string; next?: string }>()
-  const storedHash = board.getConfig(db, 'admin_hash')
-  if (!current || !storedHash || !verifySecret(current, storedHash))
-    return c.json({ error: 'Aktuelles Passwort falsch' }, 401)
-  if (!next || next.length < 10)
-    return c.json({ error: 'Neues Passwort braucht mindestens 10 Zeichen' }, 400)
-  board.setConfig(db, 'admin_hash', hashSecret(next))
+/**
+ * Credentials self-service. Both re-verify the current admin password in the
+ * body, which is what lets them sit on the teacher level: the password *is* the
+ * proof, and a login in front of it would only ask for the same secret twice.
+ * The throttle is the price of that, since anyone holding the PIN reaches these
+ * two endpoints and could otherwise guess passwords all day.
+ */
+const FAIL_WINDOW_MS = 15 * 60_000
+const FAIL_LIMIT = 5
+const failures = new Map<string, number[]>()
+
+/** True when this board has burned its attempts; prunes as it goes. */
+function throttled(boardId: string): boolean {
+  const now = Date.now()
+  const recent = (failures.get(boardId) ?? []).filter((t) => now - t < FAIL_WINDOW_MS)
+  if (recent.length === 0) failures.delete(boardId)
+  else failures.set(boardId, recent)
+  return recent.length >= FAIL_LIMIT
+}
+
+function noteFailure(boardId: string): void {
+  failures.set(boardId, [...(failures.get(boardId) ?? []), Date.now()])
+}
+
+const THROTTLED = 'Zu viele Fehlversuche. Bitte in 15 Minuten erneut versuchen.'
+
+/**
+ * Says whether this is the school's password, and changes nothing. The
+ * Verwaltung asks for it again before opening „Import" and „Zugangsdaten", the
+ * same way the PIN is asked before the page itself: both cookies outlive a
+ * school day, so a persisted session may not be what opens those two screens.
+ * Shares the throttle with the change endpoints, since it is the same guess.
+ */
+api.post('/verify-password', async (c) => {
+  const boardId = c.get('boardId')
+  if (throttled(boardId)) return c.json({ error: THROTTLED }, 429)
+  const { password } = await c.req.json<{ password?: string }>()
+  const storedHash = board.getConfig(openBoard(boardId), 'admin_hash')
+  if (!password || !storedHash || !verifySecret(password, storedHash)) {
+    noteFailure(boardId)
+    return c.json({ error: 'Passwort falsch' }, 401)
+  }
+  failures.delete(boardId)
   return c.json({ ok: true })
 })
 
-api.post('/admin/change-pin', async (c) => {
-  const db = openBoard(c.get('boardId'))
+api.post('/change-password', async (c) => {
+  const boardId = c.get('boardId')
+  const db = openBoard(boardId)
+  if (throttled(boardId)) return c.json({ error: THROTTLED }, 429)
+  const { current, next } = await c.req.json<{ current?: string; next?: string }>()
+  const storedHash = board.getConfig(db, 'admin_hash')
+  if (!current || !storedHash || !verifySecret(current, storedHash)) {
+    noteFailure(boardId)
+    return c.json({ error: 'Aktuelles Passwort falsch' }, 401)
+  }
+  if (!next || next.length < 10)
+    return c.json({ error: 'Neues Passwort braucht mindestens 10 Zeichen' }, 400)
+  board.setConfig(db, 'admin_hash', hashSecret(next))
+  failures.delete(boardId)
+  return c.json({ ok: true })
+})
+
+api.post('/change-pin', async (c) => {
+  const boardId = c.get('boardId')
+  const db = openBoard(boardId)
+  if (throttled(boardId)) return c.json({ error: THROTTLED }, 429)
   const { password, pin } = await c.req.json<{ password?: string; pin?: string }>()
   const storedHash = board.getConfig(db, 'admin_hash')
-  if (!password || !storedHash || !verifySecret(password, storedHash))
+  if (!password || !storedHash || !verifySecret(password, storedHash)) {
+    noteFailure(boardId)
     return c.json({ error: 'Passwort falsch' }, 401)
+  }
   if (!pin || !/^\d{4,8}$/.test(pin.trim()))
     return c.json({ error: 'PIN muss aus 4–8 Ziffern bestehen' }, 400)
   board.setConfig(db, 'pin_hash', hashSecret(pin.trim()))
   board.setConfig(db, 'pin_length', String(pin.trim().length))
+  failures.delete(boardId)
   return c.json({ ok: true })
 })
 
@@ -382,32 +465,38 @@ app.get('*', (c) => {
 
 // --- boot ------------------------------------------------------------------------
 
-const server = serve({ fetch: app.fetch, port: PORT, hostname: '127.0.0.1' }, (info) => {
-  console.log(`raumboard server on http://127.0.0.1:${info.port} (domain: ${BASE_DOMAIN})`)
-  if (DEMO_TENANT)
-    console.log(
-      `Demo: ${DEMO_TENANT}.${BASE_DOMAIN} — pro Besucher ein eigenes Board, nur im Speicher`,
-    )
-})
-startDemoSweeper()
-
-const wss = new WebSocketServer({ noServer: true })
-server.on('upgrade', (req, socket, head) => {
-  const url = new URL(req.url ?? '/', 'http://localhost')
-  if (url.pathname !== '/api/ws') {
-    socket.destroy()
-    return
-  }
-  const boardId = wsBoardId(req.headers.host, req.headers.cookie)
-  if (!boardId) {
-    socket.destroy()
-    return
-  }
-  wss.handleUpgrade(req, socket, head, (ws) => {
-    register(boardId, ws)
-    ws.send(JSON.stringify(stateMessage(boardId)))
+/**
+ * `RAUMBOARD_NO_LISTEN=1` builds the app without binding a port or opening
+ * sockets, which is how the access-level test drives it through `app.request`.
+ */
+if (process.env.RAUMBOARD_NO_LISTEN !== '1') {
+  const server = serve({ fetch: app.fetch, port: PORT, hostname: '127.0.0.1' }, (info) => {
+    console.log(`raumboard server on http://127.0.0.1:${info.port} (domain: ${BASE_DOMAIN})`)
+    if (DEMO_TENANT)
+      console.log(
+        `Demo: ${DEMO_TENANT}.${BASE_DOMAIN} — pro Besucher ein eigenes Board, nur im Speicher`,
+      )
   })
-})
+  startDemoSweeper()
+
+  const wss = new WebSocketServer({ noServer: true })
+  server.on('upgrade', (req, socket, head) => {
+    const url = new URL(req.url ?? '/', 'http://localhost')
+    if (url.pathname !== '/api/ws') {
+      socket.destroy()
+      return
+    }
+    const boardId = wsBoardId(req.headers.host, req.headers.cookie)
+    if (!boardId) {
+      socket.destroy()
+      return
+    }
+    wss.handleUpgrade(req, socket, head, (ws) => {
+      register(boardId, ws)
+      ws.send(JSON.stringify(stateMessage(boardId)))
+    })
+  })
+}
 
 /**
  * Same resolution as `boardFor`, from raw upgrade headers (no Hono context here).

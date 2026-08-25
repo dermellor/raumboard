@@ -163,8 +163,15 @@ sheet's structure). The school enters real data in production only.
 
 The boards address the children informally („Wohin gehst du?"). Everything an
 adult uses (Verwaltung, login, teacher PIN, import) uses „Sie", or stays
-impersonal where no address is needed („Bitte mit den Zugangsdaten der Schule
-anmelden"). An admin-side string that duzt is a bug.
+impersonal where no address is needed („Passwort bestätigen"). An admin-side
+string that duzt is a bug.
+
+## Checks
+
+`npm test` (node:test over `server/**/*.test.ts`), `npm run lint` (oxlint), and
+`npm run build`, which is the typecheck: `tsconfig.json` is a solution file with
+`files: []`, so a bare `tsc --noEmit` resolves it, checks zero files and reports
+success. Only `tsc -b`, inside `npm run build`, walks the three project references.
 
 ## Architecture (current, Phase 1)
 

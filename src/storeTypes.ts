@@ -5,8 +5,9 @@ export type StoreMeta = {
   /** false until the first state fetch (api mode); demo is always ready */
   ready: boolean
   schoolName?: string
-  /** booking mutations allowed (teacher PIN entered or admin) */
-  canBook: boolean
+  /** teacher level: bookings and the Verwaltung (teacher PIN entered, or admin) */
+  canOperate: boolean
+  /** account level: the Excel/CSV import, nothing else */
   isAdmin: boolean
   /** server runs in local dev mode (RAUMBOARD_DEV) — enables test-only affordances */
   dev: boolean
@@ -65,10 +66,13 @@ export type BoardStore = {
   ): Promise<ImportResult>
 
   login(email: string, password: string): Promise<AuthResult>
+  /** ends the admin session; the device stays unlocked for booking */
   logout(): Promise<void>
   enterPin(pin: string): Promise<AuthResult>
-  /** dev/test only: clear admin + board unlock so the PIN gate reappears */
+  /** clears admin + board unlock, so the PIN gate is asked for again */
   lockDevice(): Promise<void>
+  /** is this the school's password? changes nothing (gate in front of two tabs) */
+  verifyPassword(password: string): Promise<AuthResult>
   /** re-verify with the current password (api mode; demo has nothing to change) */
   changePassword(current: string, next: string): Promise<AuthResult>
   changePin(password: string, pin: string): Promise<AuthResult>

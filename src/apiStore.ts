@@ -7,7 +7,7 @@ import type { BoardState, BookResult } from './types'
 // corrects any race. Admin CRUD relies on the broadcast round-trip.
 
 let state: BoardState = { klasses: [], kids: [], rooms: [] }
-let meta: StoreMeta = { mode: 'api', ready: false, canBook: false, isAdmin: false, dev: false, ephemeral: false }
+let meta: StoreMeta = { mode: 'api', ready: false, canOperate: false, isAdmin: false, dev: false, ephemeral: false }
 const listeners = new Set<() => void>()
 
 function notify() {
@@ -140,31 +140,31 @@ export const apiStore: BoardStore = {
   },
 
   addRoom(name, emoji, capacity, scope) {
-    mutate('/api/admin/rooms', { name, emoji, capacity, scope })
+    mutate('/api/rooms', { name, emoji, capacity, scope })
   },
   updateRoom(roomId, patch) {
-    void request('PATCH', `/api/admin/rooms/${encodeURIComponent(roomId)}`, patch)
+    void request('PATCH', `/api/rooms/${encodeURIComponent(roomId)}`, patch)
   },
   removeRoom(roomId) {
-    void request('DELETE', `/api/admin/rooms/${encodeURIComponent(roomId)}`)
+    void request('DELETE', `/api/rooms/${encodeURIComponent(roomId)}`)
   },
   addKid(klassId, symbol, name) {
-    mutate('/api/admin/kids', { klassId, symbol, name })
+    mutate('/api/kids', { klassId, symbol, name })
   },
   updateKid(kidId, patch) {
-    void request('PATCH', `/api/admin/kids/${encodeURIComponent(kidId)}`, patch)
+    void request('PATCH', `/api/kids/${encodeURIComponent(kidId)}`, patch)
   },
   removeKid(kidId) {
-    void request('DELETE', `/api/admin/kids/${encodeURIComponent(kidId)}`)
+    void request('DELETE', `/api/kids/${encodeURIComponent(kidId)}`)
   },
   addKlass(name, emoji) {
-    mutate('/api/admin/klasses', { name, emoji })
+    mutate('/api/klasses', { name, emoji })
   },
   updateKlass(klassId, patch) {
-    void request('PATCH', `/api/admin/klasses/${encodeURIComponent(klassId)}`, patch)
+    void request('PATCH', `/api/klasses/${encodeURIComponent(klassId)}`, patch)
   },
   removeKlass(klassId) {
-    void request('DELETE', `/api/admin/klasses/${encodeURIComponent(klassId)}`)
+    void request('DELETE', `/api/klasses/${encodeURIComponent(klassId)}`)
   },
 
   async importKids(entries, targetKlass, mode): Promise<ImportResult> {
@@ -188,39 +188,47 @@ export const apiStore: BoardStore = {
     return { ok: false, reason: data.error ?? 'Login fehlgeschlagen' }
   },
 
+  /** Admin session only: the device keeps its unlock and stays bookable. */
   async logout() {
     await post('/api/logout')
-    setMeta({ isAdmin: false, canBook: false })
+    setMeta({ isAdmin: false })
     await refetch()
   },
 
   async enterPin(pin): Promise<AuthResult> {
     const res = await post('/api/pin', { pin })
     if (res.ok) {
-      setMeta({ canBook: true })
+      setMeta({ canOperate: true })
       return { ok: true }
     }
     const data = await res.json().catch(() => ({}))
     return { ok: false, reason: data.error ?? 'PIN falsch' }
   },
 
+  async verifyPassword(password): Promise<AuthResult> {
+    const res = await post('/api/verify-password', { password })
+    if (res.ok) return { ok: true }
+    const data = await res.json().catch(() => ({}))
+    return { ok: false, reason: data.error ?? 'Passwort falsch' }
+  },
+
   async changePassword(current, next): Promise<AuthResult> {
-    const res = await post('/api/admin/change-password', { current, next })
+    const res = await post('/api/change-password', { current, next })
     if (res.ok) return { ok: true }
     const data = await res.json().catch(() => ({}))
     return { ok: false, reason: data.error ?? 'Ändern fehlgeschlagen' }
   },
 
   async changePin(password, pin): Promise<AuthResult> {
-    const res = await post('/api/admin/change-pin', { password, pin })
+    const res = await post('/api/change-pin', { password, pin })
     if (res.ok) return { ok: true }
     const data = await res.json().catch(() => ({}))
     return { ok: false, reason: data.error ?? 'Ändern fehlgeschlagen' }
   },
 
   async lockDevice() {
-    await post('/api/logout')
-    setMeta({ isAdmin: false, canBook: false })
+    await post('/api/lock')
+    setMeta({ isAdmin: false, canOperate: false })
     await refetch()
   },
 }

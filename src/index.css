@@ -722,11 +722,29 @@ h1 {
   align-items: center;
   gap: 0.6rem;
   margin-block: 0.75rem;
+  /* the modal's close button floats right and is taller than the title, so the
+     first row would dodge it and end up narrower than the ones below it */
+  clear: right;
 }
 
 .field label {
   min-width: 6.5rem;
   font-weight: 600;
+}
+
+/* The text field takes the rest of the row. Styled here rather than under
+   `.admin`, because the same rows appear on the start page (the account gate),
+   where that scope does not apply and the fields fell back to browser defaults.
+   An inline width (the room capacity, say) still wins over the 100%. */
+.field input {
+  width: 100%;
+  min-width: 0;
+  min-height: 2.6rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 0.6rem;
+  border: 2px solid var(--line);
+  background: var(--card);
+  font: inherit;
 }
 
 .form-error {

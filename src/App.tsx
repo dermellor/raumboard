@@ -48,7 +48,7 @@ export function App() {
         </button>
       )}
       {/* local dev only: clear the session so the PIN gate can be tested */}
-      {meta.dev && meta.canBook && (
+      {meta.dev && meta.canOperate && (
         <button
           className="dev-lock"
           title="Nur lokal: Admin-Session und Geräte-PIN zurücksetzen, um die PIN-Eingabe zu testen"

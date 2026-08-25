@@ -35,7 +35,7 @@ export function KlassenBoard({ klassId }: { klassId: string }) {
               className="tile"
               aria-pressed={kid.id === selectedKidId}
               onClick={() => {
-                if (!meta.canBook) return setShowPin(true)
+                if (!meta.canOperate) return setShowPin(true)
                 setSelectedKidId(kid.id === selectedKidId ? null : kid.id)
               }}
             >

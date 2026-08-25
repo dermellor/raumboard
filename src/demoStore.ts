@@ -8,7 +8,7 @@ import type { BoardState, BookResult, Kid, Klass, Room } from './types'
 
 const STORAGE_KEY = 'lernraum-board-v1'
 
-const META: StoreMeta = { mode: 'demo', ready: true, canBook: true, isAdmin: true, dev: false, ephemeral: false }
+const META: StoreMeta = { mode: 'demo', ready: true, canOperate: true, isAdmin: true, dev: false, ephemeral: false }
 
 let state: BoardState = load()
 const listeners = new Set<() => void>()
@@ -206,6 +206,9 @@ export const demoStore: BoardStore = {
   },
   async logout() {},
   async enterPin() {
+    return { ok: true as const }
+  },
+  async verifyPassword() {
     return { ok: true as const }
   },
   async changePassword() {
