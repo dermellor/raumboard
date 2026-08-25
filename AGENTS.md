@@ -407,34 +407,35 @@ where the CLI writes the credentials it printed, backup migration steps) live in
 **A deploy does not publish anything.** It rsyncs a locally built tree to the
 server over SSH; the public repo is a separate step and a separate history.
 
-## Publishing to the public repo
+## Publishing
 
-The public repo has **no common ancestor** with the development history, and
-must not get one. Development commits from before 2026-08-02 carry the pilot
-school's name and slug, a handover mail naming a school's head with their work
-address, and the operator's server alias. Those were removed from the tree,
-which leaves them in the commits: pushing the development branch would publish
-all of it. The current tree is clean, so publishing copies the **tree**, never
-the history.
+**One history, one branch.** `git push` is all there is between a commit and the
+public repo. This was not always so: until 2026-08-25 the development history
+carried a handover mail naming a school's head with their work address, plus the
+pilot school's name and slug and the operator's server alias. They had been
+taken out of the tree, which left them in the commits, so the public repo was a
+separate curated history with no common ancestor. That history was rewritten
+(the file dropped, the strings replaced), the two tracks were merged into one,
+and the second track is gone.
 
-[`scripts/publish.sh`](scripts/publish.sh) does that, and pushes nothing:
+The lesson it left behind is the one worth keeping:
+
+> Removing something from the tree does not remove it from the history. A commit
+> that fixes a file leaves every commit before it untouched.
+
+That failed twice, so it is a script rather than a rule.
+[`scripts/check-private.sh`](scripts/check-private.sh) scans a ref's whole
+history, blobs and commit messages, against
+`~/.config/raumboard/publish-guard.txt` (one case-insensitive regex per line):
 
 ```bash
-bash scripts/publish.sh --dry-run    # what would be published
-bash scripts/publish.sh              # one commit on `publish`, then stops
-git push public publish:main         # your call, separately
+bash scripts/check-private.sh          # HEAD
+bash scripts/check-private.sh main     # before a push
 ```
 
-It reads the tree of a **ref** rather than the working directory, so an
-unrelated work-in-progress in the checkout cannot end up in a release, and it
-writes one commit on `publish` whose parent is the previously published one.
-
-- **It refuses on the pattern list**, `~/.config/raumboard/publish-guard.txt`
-  (one case-insensitive regex per line), and refuses just as hard when that file
-  is missing: no check must ever look like a passed check. The list names the
-  private things, so it lives outside the repo like an instance profile.
-- **The published commit records its source** as a `Raumboard-source:` trailer.
-  That is how the next run knows the range to summarize, so the public repo
-  carries its own bookkeeping and no state lives beside git.
-- **An identical tree is a no-op**, and `git update-ref refs/heads/publish <old>`
-  undoes a release that has not been pushed yet.
+- **A missing pattern list aborts**, because no check must ever read like a
+  passed check. The list names the private things, so it lives outside the repo
+  like an instance profile.
+- **It is worth wiring as a pre-push hook**; the header says how.
+- **Nothing private ever reached the public repo.** The rewrite was a cleanup,
+  not damage control, and a fresh clone of the public repo passes the check.
