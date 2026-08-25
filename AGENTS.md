@@ -30,17 +30,9 @@ First rollout is a pilot primary school in NRW.
 - **Server:** a Linux VPS with a reverse proxy (wildcard or on-demand TLS for
   `*.raumboard.de`), Node/Hono, WebSockets for realtime, and per-school DB backups
   to object storage.
-- **Auth:** per school one admin login (email + password, Argon2, cookie session)
-  for Verwaltung + one teacher PIN that unlocks class boards per device. Kids
-  never log in. Onboarding/reset is manual by the operator in the early phase.
-  **The Verwaltung asks for the teacher PIN on every entry**, in front of the
-  admin session. Both cookies outlive a school day (board 180 days, admin 30) by
-  design, and the boards run on a whiteboard the children operate themselves, so
-  a persisted session alone would leave `#/admin` one tap away for a class. The
-  gate is component state in [`src/views/Admin.tsx`](src/views/Admin.tsx), not a
-  cookie: leaving the page locks it again. It guards the screen, not the data —
-  admin mutations still need `rb_admin` on the server, so the PIN adds a barrier
-  and replaces nothing.
+- **Auth:** per school one admin login for Verwaltung plus one teacher PIN that
+  unlocks boards per device. Kids never log in. Onboarding and reset are manual
+  by the operator in the early phase. See „Auth: PIN and login" below.
 - **Data minimization:** first name + initial only, never full names.
 - **AVV/DSGVO:** hosting for schools makes the hosting operator an
   Auftragsverarbeiter even when free — AVV template + TOM doc required before the
@@ -52,6 +44,54 @@ First rollout is a pilot primary school in NRW.
   as an instance profile and read by the same loader. A value that is missing
   leaves its placeholder standing in the PDF and warns, which is visible while
   proofreading; a plausible default would not be.
+
+## Auth: PIN and login
+
+Who needs which secret is in [`README.md`](README.md); this is the mechanism.
+Both secrets are scrypt hashes in the tenant's `config` table
+([`server/auth.ts`](server/auth.ts)), both are carried by HMAC-signed stateless
+cookies (no session store), and neither can stand in for the other.
+
+| | Teacher PIN | Admin login |
+| --- | --- | --- |
+| Secret | 4 to 8 digits (6 when generated), `pin_hash` | email + password, `admin_email` / `admin_hash` |
+| Endpoint | `POST /api/pin` | `POST /api/login` |
+| Cookie / TTL | `rb_board`, 180 days | `rb_admin`, 30 days |
+| Unlocks | `/api/book`, `/api/unbook`, `/api/reset` | everything under `/api/admin/*` |
+
+The server derives `canBook = isAdmin || hasBoard` ([`server/index.ts`](server/index.ts)),
+which is the whole interplay:
+
+| Cookies held | Book on a board | Enter Verwaltung | Change data |
+| --- | --- | --- | --- |
+| PIN only | yes | screen yes, then the login form | no |
+| login only | yes | no, the PIN is asked first | yes |
+| both | yes | yes | yes |
+
+Consequences worth knowing before touching this:
+
+- **The Verwaltung asks for the PIN on every entry**, in front of the admin
+  session, and an admin session does not skip it. The boards run on a whiteboard
+  the children operate themselves and both cookies outlive a school day by
+  design, so a persisted session alone would leave `#/admin` one tap away for a
+  class. The gate is component state in
+  [`src/views/Admin.tsx`](src/views/Admin.tsx), not a cookie: switching tabs
+  inside the page keeps it open, leaving or reloading the page locks it again.
+- **It guards the screen, not the data.** Admin mutations still need `rb_admin`
+  on the server, so the PIN adds a barrier and replaces nothing.
+- **The gate's PIN entry sets `rb_board` too**, since it posts to the same
+  endpoint as the board gate. Opening the Verwaltung on a fresh whiteboard
+  therefore unlocks that device for booking as well.
+- **`POST /api/admin/change-pin` verifies the admin password**, not the current
+  PIN: the login is the master key and the PIN is authority handed down from it.
+- **A new PIN cannot invalidate `rb_board`**, because the token is signed and
+  carries an expiry with no reference to the PIN hash. That is deliberate, since
+  the alternative locks every whiteboard in the school mid-year. Revoking one
+  device means `POST /api/logout` from it (which clears both cookies), so a
+  „reset all devices" feature would need a tenant-wide token epoch first.
+
+Provisioning and recovery live in [`server/cli.ts`](server/cli.ts) and print the
+secrets to stdout only.
 
 ## Status / roadmap
 
@@ -298,3 +338,7 @@ A Docker/Compose self-hosting path is the Phase-4 goal.
 
 **Static demo:** `npm run build` produces a `dist/` that runs in demo mode
 (frontend-only localStorage store), suitable for any static host.
+
+Operator-specific notes for the maintainer's own hosted instance (server layout,
+where the CLI writes the credentials it printed, backup migration steps) live in
+`DEPLOY.local.md`, which is untracked by design.
