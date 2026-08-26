@@ -1,6 +1,7 @@
 import type Database from 'better-sqlite3'
+import { randomBytes } from 'node:crypto'
 import { canBook } from '../src/boardLogic'
-import type { BoardState, BookResult, Kid, Klass, Room } from '../src/types'
+import type { Account, BoardState, BookResult, Kid, Klass, Role, Room } from '../src/types'
 
 // Server-side board operations. The rules live in src/boardLogic.ts (shared
 // with the frontend stores) — this module loads state from SQLite, applies
@@ -47,6 +48,100 @@ export function setConfig(db: Database.Database, key: string, value: string): vo
   db.prepare(
     'INSERT INTO config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
   ).run(key, value)
+}
+
+// --- accounts ----------------------------------------------------------------
+
+// The login level: one row per admin account, keyed by a random id so an email
+// can change without breaking the signed token that references it. The teacher
+// PIN is not here — it stays a single school-wide secret in `config`.
+
+function rowToAccount(r: {
+  id: string
+  email: string
+  role: string
+  active: number
+}): Account {
+  return { id: r.id, email: r.email, role: r.role as Role, active: !!r.active }
+}
+
+/** All accounts, owners first, then by email — a stable order for the list. */
+export function listUsers(db: Database.Database): Account[] {
+  return (
+    db
+      .prepare(
+        "SELECT id, email, role, active FROM users ORDER BY role = 'owner' DESC, email",
+      )
+      .all() as any[]
+  ).map(rowToAccount)
+}
+
+/** The active account behind a token's id, or undefined (unknown/deactivated). */
+export function getActiveUser(db: Database.Database, id: string): Account | undefined {
+  const row = db
+    .prepare('SELECT id, email, role, active FROM users WHERE id = ? AND active = 1')
+    .get(id) as any
+  return row ? rowToAccount(row) : undefined
+}
+
+/** Login lookup: the active account for an email, hash included for verifying. */
+export function findUserByEmail(
+  db: Database.Database,
+  email: string,
+): (Account & { passHash: string }) | undefined {
+  const row = db
+    .prepare('SELECT id, email, role, active, pass_hash FROM users WHERE email = ? AND active = 1')
+    .get(email.trim().toLowerCase()) as any
+  return row ? { ...rowToAccount(row), passHash: row.pass_hash } : undefined
+}
+
+export function countActiveOwners(db: Database.Database): number {
+  return (
+    db.prepare("SELECT count(*) AS n FROM users WHERE role = 'owner' AND active = 1").get() as {
+      n: number
+    }
+  ).n
+}
+
+/**
+ * Creates an account. `passHash` is a scrypt hash (the caller generates and
+ * shows the plaintext once). Throws on a duplicate email so the route can turn
+ * it into a clean 409 rather than a SQLite constraint error.
+ */
+export function createUser(
+  db: Database.Database,
+  email: string,
+  passHash: string,
+  role: Role,
+): Account {
+  const normalized = email.trim().toLowerCase()
+  const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(normalized)
+  if (existing) throw new Error('email exists')
+  const id = randomBytes(9).toString('base64url')
+  db.prepare(
+    'INSERT INTO users (id, email, pass_hash, role, active) VALUES (?, ?, ?, ?, 1)',
+  ).run(id, normalized, passHash, role)
+  return { id, email: normalized, role, active: true }
+}
+
+/** The stored scrypt hash of an account, for re-verifying its own password. */
+export function getPassHash(db: Database.Database, id: string): string | undefined {
+  const row = db.prepare('SELECT pass_hash FROM users WHERE id = ? AND active = 1').get(id) as
+    | { pass_hash: string }
+    | undefined
+  return row?.pass_hash
+}
+
+export function setUserRole(db: Database.Database, id: string, role: Role): void {
+  db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, id)
+}
+
+export function setUserActive(db: Database.Database, id: string, active: boolean): void {
+  db.prepare('UPDATE users SET active = ? WHERE id = ?').run(active ? 1 : 0, id)
+}
+
+export function setUserPassword(db: Database.Database, id: string, passHash: string): void {
+  db.prepare('UPDATE users SET pass_hash = ? WHERE id = ?').run(passHash, id)
 }
 
 // --- booking ---------------------------------------------------------------

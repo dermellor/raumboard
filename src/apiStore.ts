@@ -1,6 +1,13 @@
 import { canBook } from './boardLogic'
-import type { AuthResult, BoardStore, ImportResult, StoreMeta } from './storeTypes'
-import type { BoardState, BookResult } from './types'
+import type {
+  AuthResult,
+  BoardStore,
+  CreateAccountResult,
+  ImportResult,
+  PasswordResult,
+  StoreMeta,
+} from './storeTypes'
+import type { Account, BoardState, BookResult, Role } from './types'
 
 // Server-backed store: REST mutations + WebSocket push. Booking mutations are
 // optimistic (local rule check applies instantly), the server broadcast
@@ -230,5 +237,37 @@ export const apiStore: BoardStore = {
     await post('/api/lock')
     setMeta({ isAdmin: false, canOperate: false })
     await refetch()
+  },
+
+  async listAccounts(): Promise<Account[]> {
+    const res = await fetch('/api/accounts')
+    if (!res.ok) return []
+    const data = await res.json().catch(() => ({}))
+    return (data.accounts ?? []) as Account[]
+  },
+
+  async createAccount(email, role: Role): Promise<CreateAccountResult> {
+    const res = await post('/api/accounts', { email, role })
+    const data = await res.json().catch(() => ({}))
+    if (res.ok) return { ok: true, account: data.account as Account, password: data.password as string }
+    return { ok: false, reason: data.error ?? 'Anlegen fehlgeschlagen' }
+  },
+
+  async updateAccount(id, patch): Promise<AuthResult> {
+    const res = await fetch(`/api/accounts/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    })
+    if (res.ok) return { ok: true }
+    const data = await res.json().catch(() => ({}))
+    return { ok: false, reason: data.error ?? 'Ändern fehlgeschlagen' }
+  },
+
+  async resetAccountPassword(id): Promise<PasswordResult> {
+    const res = await post(`/api/accounts/${encodeURIComponent(id)}/reset-password`)
+    const data = await res.json().catch(() => ({}))
+    if (res.ok) return { ok: true, password: data.password as string }
+    return { ok: false, reason: data.error ?? 'Zurücksetzen fehlgeschlagen' }
   },
 }

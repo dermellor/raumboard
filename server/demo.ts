@@ -96,8 +96,10 @@ function seed(db: Database.Database): void {
   migrate(db, DEMO_TENANT ?? 'demo')
   board.replaceAll(db, buildSeed())
   board.setConfig(db, 'school_name', DEMO_SCHOOL_NAME)
-  board.setConfig(db, 'admin_email', LOGIN.toLowerCase())
-  board.setConfig(db, 'admin_hash', credentialHashes().admin)
+  // one published owner account; wiping first drops any extra account a visitor
+  // may have added through the demo, so a reset is back to a clean single login
+  db.prepare('DELETE FROM users').run()
+  board.createUser(db, LOGIN.toLowerCase(), credentialHashes().admin, 'owner')
   board.setConfig(db, 'pin_hash', credentialHashes().pin)
   board.setConfig(db, 'pin_length', String(PIN.length))
 }

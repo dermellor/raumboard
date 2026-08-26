@@ -7,7 +7,16 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { WebSocketServer } from 'ws'
 import * as board from './board'
-import { hashSecret, makeToken, verifySecret, verifyToken } from './auth'
+import {
+  generatePassword,
+  hashSecret,
+  makeAdminToken,
+  makeToken,
+  verifyAdminToken,
+  verifySecret,
+  verifyToken,
+} from './auth'
+import type { Role } from '../src/types'
 import { BASE_DOMAIN, DEFAULT_TENANT, DEMO_TENANT, openTenant, slugFromHost, tenantExists } from './tenant'
 import {
   DEMO_SCHOOL_NAME,
@@ -42,9 +51,12 @@ if (DEV && DEFAULT_TENANT && DEFAULT_TENANT !== DEMO_TENANT) {
     board.replaceAll(db, buildSeed())
     board.setConfig(db, 'school_name', 'Lokale Testschule')
   }
-  // known dev credentials (idempotent; keeps board data across restarts)
-  board.setConfig(db, 'admin_email', 'dev@raumboard.local')
-  board.setConfig(db, 'admin_hash', hashSecret('raumboard'))
+  // known dev credentials (idempotent; keeps board data across restarts). The
+  // login is an owner account now; create it once, then keep its password fixed.
+  const devEmail = 'dev@raumboard.local'
+  const devOwner = board.findUserByEmail(db, devEmail)
+  if (devOwner) board.setUserPassword(db, devOwner.id, hashSecret('raumboard'))
+  else board.createUser(db, devEmail, hashSecret('raumboard'), 'owner')
   board.setConfig(db, 'pin_hash', hashSecret('0000'))
   board.setConfig(db, 'pin_length', '4')
   console.log('DEV: Mandant "%s" bereit — Login dev@raumboard.local / raumboard, PIN 0000', DEFAULT_TENANT)
@@ -81,13 +93,17 @@ app.get('/ask', (c) => {
 
 /**
  * `canOperate` is the teacher level: today's bookings *and* the Verwaltung
- * (rooms, classes, kids, credential changes). `isAdmin` is only needed where
- * data arrives in bulk, which is the Excel/CSV import.
+ * (rooms, classes, kids). `isAdmin` means a signed-in account, needed for the
+ * import, the account's own credentials, and (owners) the account management.
+ * The admin cookie carries the account id; it is resolved against the database
+ * on every request, so a deactivated account's still-signed cookie is dead at
+ * once — unlike the PIN, which a new value cannot revoke.
  */
 function authInfo(c: any, boardId: string) {
-  const isAdmin = verifyToken(getCookie(c, 'rb_admin'), boardId, 'admin')
+  const userId = verifyAdminToken(getCookie(c, 'rb_admin'), boardId)
+  const account = userId ? board.getActiveUser(openBoard(boardId), userId) : undefined
   const hasBoard = verifyToken(getCookie(c, 'rb_board'), boardId, 'board')
-  return { isAdmin, canOperate: isAdmin || hasBoard }
+  return { isAdmin: !!account, canOperate: !!account || hasBoard, account }
 }
 
 function openBoard(boardId: string) {
@@ -134,7 +150,7 @@ api.use('*', async (c, next) => {
 api.get('/state', (c) => {
   const boardId = c.get('boardId')
   const db = openBoard(boardId)
-  const { isAdmin, canOperate } = authInfo(c, boardId)
+  const { isAdmin, canOperate, account } = authInfo(c, boardId)
   return c.json({
     state: board.loadState(db),
     meta: {
@@ -142,6 +158,8 @@ api.get('/state', (c) => {
       schoolName: board.getConfig(db, 'school_name') ?? boardId,
       isAdmin,
       canOperate,
+      // who is signed in, so the UI can greet them and show the owner-only tab
+      account: account ? { email: account.email, role: account.role } : null,
       dev: DEV,
       // throwaway demo board: nothing is stored, so the UI may offer a reset
       ephemeral: isDemoBoard(boardId),
@@ -158,15 +176,13 @@ api.post('/login', async (c) => {
   const boardId = c.get('boardId')
   const db = openBoard(boardId)
   const { email, password } = await c.req.json<{ email?: string; password?: string }>()
-  const storedEmail = board.getConfig(db, 'admin_email')
-  const storedHash = board.getConfig(db, 'admin_hash')
-  if (
-    !email || !password || !storedEmail || !storedHash ||
-    email.trim().toLowerCase() !== storedEmail.toLowerCase() ||
-    !verifySecret(password, storedHash)
-  )
+  const user = email ? board.findUserByEmail(db, email) : undefined
+  if (!user || !password || !verifySecret(password, user.passHash))
     return c.json({ error: 'E-Mail oder Passwort falsch' }, 401)
-  setCookie(c, 'rb_admin', makeToken(boardId, 'admin', ADMIN_TTL), { ...cookieOpts(), maxAge: ADMIN_TTL })
+  setCookie(c, 'rb_admin', makeAdminToken(boardId, user.id, ADMIN_TTL), {
+    ...cookieOpts(),
+    maxAge: ADMIN_TTL,
+  })
   return c.json({ ok: true })
 })
 
@@ -205,7 +221,6 @@ api.post('/pin', async (c) => {
 const BOARD_PATHS = [
   '/book', '/unbook', '/reset',
   '/rooms', '/rooms/*', '/kids', '/kids/*', '/klasses', '/klasses/*',
-  '/verify-password', '/change-password', '/change-pin',
 ]
 for (const p of BOARD_PATHS) api.use(p, boardGuard)
 
@@ -213,6 +228,29 @@ async function boardGuard(c: any, next: () => Promise<void>) {
   if (!authInfo(c, c.get('boardId')).canOperate) return c.json({ error: 'locked' }, 401)
   await next()
 }
+
+/**
+ * The account's own credentials. These need to know *which* account, so they
+ * require a signed-in session (the admin cookie), not just the PIN: the body
+ * password is checked against that account. A PIN-only device is refused here.
+ */
+async function adminGuard(c: any, next: () => Promise<void>) {
+  if (!authInfo(c, c.get('boardId')).isAdmin) return c.json({ error: 'admin required' }, 401)
+  await next()
+}
+for (const p of ['/verify-password', '/change-password', '/change-pin']) api.use(p, adminGuard)
+
+/**
+ * Managing *other* accounts is the owner's job only. Its own prefix, with a
+ * guard stricter than `/admin/` (which any account passes): an admin can import
+ * and change its own password, but cannot touch the roster.
+ */
+async function ownerGuard(c: any, next: () => Promise<void>) {
+  if (authInfo(c, c.get('boardId')).account?.role !== 'owner')
+    return c.json({ error: 'owner required' }, 403)
+  await next()
+}
+for (const p of ['/accounts', '/accounts/*']) api.use(p, ownerGuard)
 
 api.post('/book', async (c) => {
   const boardId = c.get('boardId')
@@ -344,11 +382,12 @@ api.delete('/klasses/:id', (c) => {
 })
 
 /**
- * Credentials self-service. Both re-verify the current admin password in the
- * body, which is what lets them sit on the teacher level: the password *is* the
- * proof, and a login in front of it would only ask for the same secret twice.
- * The throttle is the price of that, since anyone holding the PIN reaches these
- * two endpoints and could otherwise guess passwords all day.
+ * Credentials self-service for the signed-in account. All three re-verify a
+ * password from the body against *that account*, so the admin cookie only says
+ * who you are, and the password proves it is still you at this device (both
+ * cookies outlive a school day). The throttle guards the guessing that opens up
+ * because the same body-password path is reachable from an unlocked device.
+ * `change-pin` changes the school-wide teacher PIN, not anything per-account.
  */
 const FAIL_WINDOW_MS = 15 * 60_000
 const FAIL_LIMIT = 5
@@ -380,7 +419,8 @@ api.post('/verify-password', async (c) => {
   const boardId = c.get('boardId')
   if (throttled(boardId)) return c.json({ error: THROTTLED }, 429)
   const { password } = await c.req.json<{ password?: string }>()
-  const storedHash = board.getConfig(openBoard(boardId), 'admin_hash')
+  const { account } = authInfo(c, boardId)
+  const storedHash = account && board.getPassHash(openBoard(boardId), account.id)
   if (!password || !storedHash || !verifySecret(password, storedHash)) {
     noteFailure(boardId)
     return c.json({ error: 'Passwort falsch' }, 401)
@@ -394,14 +434,15 @@ api.post('/change-password', async (c) => {
   const db = openBoard(boardId)
   if (throttled(boardId)) return c.json({ error: THROTTLED }, 429)
   const { current, next } = await c.req.json<{ current?: string; next?: string }>()
-  const storedHash = board.getConfig(db, 'admin_hash')
+  const { account } = authInfo(c, boardId)
+  const storedHash = account && board.getPassHash(db, account.id)
   if (!current || !storedHash || !verifySecret(current, storedHash)) {
     noteFailure(boardId)
     return c.json({ error: 'Aktuelles Passwort falsch' }, 401)
   }
   if (!next || next.length < 10)
     return c.json({ error: 'Neues Passwort braucht mindestens 10 Zeichen' }, 400)
-  board.setConfig(db, 'admin_hash', hashSecret(next))
+  board.setUserPassword(db, account.id, hashSecret(next))
   failures.delete(boardId)
   return c.json({ ok: true })
 })
@@ -411,7 +452,8 @@ api.post('/change-pin', async (c) => {
   const db = openBoard(boardId)
   if (throttled(boardId)) return c.json({ error: THROTTLED }, 429)
   const { password, pin } = await c.req.json<{ password?: string; pin?: string }>()
-  const storedHash = board.getConfig(db, 'admin_hash')
+  const { account } = authInfo(c, boardId)
+  const storedHash = account && board.getPassHash(db, account.id)
   if (!password || !storedHash || !verifySecret(password, storedHash)) {
     noteFailure(boardId)
     return c.json({ error: 'Passwort falsch' }, 401)
@@ -422,6 +464,62 @@ api.post('/change-pin', async (c) => {
   board.setConfig(db, 'pin_length', String(pin.trim().length))
   failures.delete(boardId)
   return c.json({ ok: true })
+})
+
+// --- account management (owner only, see ownerGuard) -------------------------
+//
+// Deactivating instead of deleting keeps the roster reversible. Two invariants
+// are enforced server-side (the UI mirrors them, but the server is the guard):
+// the school must keep at least one active owner, and an owner cannot demote or
+// deactivate their own account (that would be a foot-gun mid-session — another
+// owner does it). New and reset passwords are generated and returned once.
+
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
+
+api.get('/accounts', (c) => {
+  return c.json({ accounts: board.listUsers(openBoard(c.get('boardId'))) })
+})
+
+api.post('/accounts', async (c) => {
+  const db = openBoard(c.get('boardId'))
+  const { email, role } = await c.req.json<{ email?: string; role?: string }>()
+  const clean = (email ?? '').trim().toLowerCase()
+  if (!EMAIL_RE.test(clean)) return c.json({ error: 'Bitte eine gültige E-Mail angeben' }, 400)
+  const password = generatePassword()
+  try {
+    const account = board.createUser(db, clean, hashSecret(password), role === 'owner' ? 'owner' : 'admin')
+    return c.json({ ok: true, account, password })
+  } catch {
+    return c.json({ error: 'Für diese E-Mail gibt es bereits ein Konto' }, 409)
+  }
+})
+
+api.patch('/accounts/:id', async (c) => {
+  const db = openBoard(c.get('boardId'))
+  const acting = authInfo(c, c.get('boardId')).account!
+  const id = c.req.param('id')
+  const target = board.listUsers(db).find((u) => u.id === id)
+  if (!target) return c.json({ error: 'Konto nicht gefunden' }, 404)
+  const { role, active } = await c.req.json<{ role?: Role; active?: boolean }>()
+  const nextRole: Role | undefined = role === undefined ? undefined : role === 'owner' ? 'owner' : 'admin'
+  const demoting = nextRole !== undefined && nextRole !== 'owner' && target.role === 'owner'
+  const deactivating = active === false && target.active
+  if ((demoting || deactivating) && target.id === acting.id)
+    return c.json({ error: 'Das eigene Konto lässt sich nicht herabstufen oder deaktivieren' }, 409)
+  if ((demoting || deactivating) && target.role === 'owner' && board.countActiveOwners(db) <= 1)
+    return c.json({ error: 'Die Schule braucht mindestens ein aktives Inhaber-Konto' }, 409)
+  if (nextRole !== undefined) board.setUserRole(db, id, nextRole)
+  if (active !== undefined) board.setUserActive(db, id, active)
+  return c.json({ ok: true })
+})
+
+api.post('/accounts/:id/reset-password', (c) => {
+  const db = openBoard(c.get('boardId'))
+  const id = c.req.param('id')
+  if (!board.listUsers(db).some((u) => u.id === id)) return c.json({ error: 'Konto nicht gefunden' }, 404)
+  const password = generatePassword()
+  board.setUserPassword(db, id, hashSecret(password))
+  return c.json({ ok: true, password })
 })
 
 app.route('/api', api)

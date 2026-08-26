@@ -79,7 +79,9 @@ test('reset restores the seed and the published credentials', () => {
 
   board.book(db, someKid(db).id, someRoom(db).id)
   board.removeKid(db, someKid(db).id)
-  board.setConfig(db, 'admin_hash', 'scrypt:1:1:1:x:y') // as if an admin changed it
+  // as if an admin changed the login in the demo: password and roster
+  board.setUserPassword(db, board.listUsers(db)[0].id, 'scrypt:1:1:1:x:y')
+  board.createUser(db, 'extra@raumboard.de', 'scrypt:1:1:1:a:b', 'admin')
   board.setConfig(db, 'school_name', 'Umbenannt')
 
   resetDemoBoard(id)
@@ -88,8 +90,12 @@ test('reset restores the seed and the published credentials', () => {
   assert.equal(after.kids.length, kidCount)
   assert.deepEqual(after.kids.filter((k) => k.currentRoomId !== null), [])
   assert.equal(board.getConfig(db, 'school_name'), 'Demoschule')
-  assert.equal(board.getConfig(db, 'admin_email'), 'demo@raumboard.de')
-  assert.ok(verifySecret('geheim-demo', board.getConfig(db, 'admin_hash')!))
+  // back to the single published owner account, extras dropped
+  const accounts = board.listUsers(db)
+  assert.equal(accounts.length, 1)
+  assert.equal(accounts[0].email, 'demo@raumboard.de')
+  assert.equal(accounts[0].role, 'owner')
+  assert.ok(verifySecret('geheim-demo', board.getPassHash(db, accounts[0].id)!))
   assert.ok(verifySecret('4321', board.getConfig(db, 'pin_hash')!))
   assert.equal(board.getConfig(db, 'pin_length'), '4')
 })

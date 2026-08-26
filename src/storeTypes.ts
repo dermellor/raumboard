@@ -1,4 +1,4 @@
-import type { BoardState, BookResult, Kid, Klass, Room } from './types'
+import type { Account, BoardState, BookResult, Kid, Klass, Role, Room } from './types'
 
 export type StoreMeta = {
   mode: 'demo' | 'api'
@@ -7,8 +7,12 @@ export type StoreMeta = {
   schoolName?: string
   /** teacher level: bookings and the Verwaltung (teacher PIN entered, or admin) */
   canOperate: boolean
-  /** account level: the Excel/CSV import, nothing else */
+  /** account level: a signed-in account (import, own credentials, and for an
+   * owner the account management) */
   isAdmin: boolean
+  /** the signed-in account, or null: its email (to greet) and role (owners see
+   * the „Konten" tab). Null on a demo board and in demo mode. */
+  account?: { email: string; role: Role } | null
   /** server runs in local dev mode (RAUMBOARD_DEV) — enables test-only affordances */
   dev: boolean
   /**
@@ -26,6 +30,12 @@ export type StoreMeta = {
 }
 
 export type AuthResult = { ok: true } | { ok: false; reason: string }
+
+/** A generated password is handed back once, to show and never store. */
+export type PasswordResult = { ok: true; password: string } | { ok: false; reason: string }
+export type CreateAccountResult =
+  | { ok: true; account: Account; password: string }
+  | { ok: false; reason: string }
 
 export type ImportEntry = { name: string; symbol: string; klass: string | null }
 export type ImportResult =
@@ -76,4 +86,10 @@ export type BoardStore = {
   /** re-verify with the current password (api mode; demo has nothing to change) */
   changePassword(current: string, next: string): Promise<AuthResult>
   changePin(password: string, pin: string): Promise<AuthResult>
+
+  /** account management (owner only, api mode) */
+  listAccounts(): Promise<Account[]>
+  createAccount(email: string, role: Role): Promise<CreateAccountResult>
+  updateAccount(id: string, patch: { role?: Role; active?: boolean }): Promise<AuthResult>
+  resetAccountPassword(id: string): Promise<PasswordResult>
 }

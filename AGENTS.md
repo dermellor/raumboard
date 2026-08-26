@@ -31,8 +31,9 @@ First rollout is a pilot primary school in NRW.
   `*.raumboard.de`), Node/Hono, WebSockets for realtime, and per-school DB backups
   to object storage.
 - **Auth:** per school one teacher PIN that unlocks boards per device and carries
-  the Verwaltung, plus one admin login for the Excel/CSV import. Kids never log
-  in. Onboarding and reset are manual by the operator in the early phase. See
+  the Verwaltung, plus one or more admin accounts (email + password, role owner
+  or admin) for the import, the credentials, and the account roster. Kids never
+  log in. Onboarding and reset are manual by the operator in the early phase. See
   „Auth: PIN and login" below.
 - **Data minimization:** first name + initial only, never full names.
 - **AVV/DSGVO:** hosting for schools makes the hosting operator an
@@ -49,33 +50,44 @@ First rollout is a pilot primary school in NRW.
 ## Auth: PIN and login
 
 Who needs which secret is in [`README.md`](README.md); this is the mechanism.
-Both secrets are scrypt hashes in the tenant's `config` table
-([`server/auth.ts`](server/auth.ts)), both are carried by HMAC-signed stateless
-cookies (no session store), and neither can stand in for the other.
+The teacher PIN is a scrypt hash in the tenant's `config` table; the admin
+accounts are rows in a `users` table (`email`, `pass_hash`, `role`, `active`),
+one per person. All hashes are scrypt ([`server/auth.ts`](server/auth.ts)), both
+cookies are HMAC-signed and stateless (no session store), and neither can stand
+in for the other.
 
-| | Teacher PIN | Admin login |
+| | Teacher PIN | Admin account |
 | --- | --- | --- |
-| Secret | 4 to 8 digits (6 when generated), `pin_hash` | email + password, `admin_email` / `admin_hash` |
+| Secret | 4 to 8 digits (6 when generated), `pin_hash` in `config` | email + password per account, a row in `users` |
 | Endpoint | `POST /api/pin` | `POST /api/login` |
-| Cookie / TTL | `rb_board`, 180 days | `rb_admin`, 30 days |
-| Unlocks | `/api/book`, `/api/unbook`, `/api/reset` and the Verwaltung: `/api/rooms`, `/api/kids`, `/api/klasses`, `/api/verify-password`, `/api/change-password`, `/api/change-pin` | everything under `/api/admin/*`, which is `POST /api/admin/import` and nothing else |
+| Cookie / TTL | `rb_board`, 180 days | `rb_admin`, 30 days, carrying the account id |
+| Unlocks | `/api/book`, `/api/unbook`, `/api/reset` and the Verwaltung CRUD: `/api/rooms`, `/api/kids`, `/api/klasses` | its own credentials (`/api/verify-password`, `/api/change-password`, `/api/change-pin`), the import (`/api/admin/*`), and for an owner the roster (`/api/accounts/*`) |
 
 **The dividing line is bulk.** The import is the one mutation that brings personal
 data in from outside and can replace the whole school's data in a single step
 (`mode: 'replace'`), and it happens about once a year, at the start of the school
-year, with the responsible person sitting in front of the list. Everything else in
-the Verwaltung is single-record editing: one room, one class, one child, visible
-and individually repairable. So `/api/admin/` as a path prefix means „needs the
-login", and the CRUD routes live one level up without it.
+year, with the responsible person sitting in front of the list. The single-record
+Verwaltung editing (one room, one class, one child, visible and individually
+repairable) sits on the PIN. So `/api/admin/` as a path prefix means „needs an
+account", and the CRUD routes live one level up on the PIN without it.
 
-The server derives `canOperate = isAdmin || hasBoard` ([`server/index.ts`](server/index.ts)),
-which is the whole interplay:
+**Several accounts, two roles.** A school starts with one `owner` (the login the
+operator hands over) and the owner adds the rest in the Verwaltung. An `admin`
+does the import and its own password; an `owner` additionally manages the roster.
+The `rb_admin` cookie names *which* account, so „change my password" and account
+deactivation act on the right one, and a deactivated account's still-signed
+cookie is dead at the next request (the id is resolved against `users` each time,
+unlike the PIN, which a new value cannot revoke). Deactivating replaces deleting,
+so the roster is reversible.
 
-| Cookies held | Book on a board | Verwaltung: rooms, classes, kids | Import and Zugangsdaten |
+The server derives `canOperate = isAdmin || hasBoard`, and `isAdmin` now means „a
+signed-in, still-active account" ([`server/index.ts`](server/index.ts)):
+
+| Cookies held | Book on a board | Verwaltung: rooms, classes, kids | Import, Zugangsdaten, Konten |
 | --- | --- | --- | --- |
-| PIN only | yes | yes | the password opens the screen; the import itself still needs the login |
-| login only | yes | API yes, but the screen asks for the PIN first | yes, after the password |
-| both | yes | yes | yes, after the password |
+| PIN only | yes | yes | the gate signs in first (email + password) |
+| account only | yes | API yes, but the screen asks for the PIN first | yes, after the password (Konten only for owners) |
+| both | yes | yes | yes, after the password (Konten only for owners) |
 
 Consequences worth knowing before touching this:
 
@@ -85,13 +97,14 @@ Consequences worth knowing before touching this:
   `#/admin` one tap away for a class. The gate is component state in
   [`src/views/Admin.tsx`](src/views/Admin.tsx), not a cookie: switching tabs
   inside the page keeps it open, leaving or reloading the page locks it again.
-- **„Kinder importieren" and „Zugangsdaten" ask for the school's password before
-  they open**, by the same means and for the same reason: one brings personal data
-  in from outside, the other holds the keys to the school, and a 30-day session
-  cookie may not be what opens either. `PASSWORD_TABS` in
-  [`src/views/Admin.tsx`](src/views/Admin.tsx) names them, the prompt is
-  [`src/PasswordGate.tsx`](src/PasswordGate.tsx), and one confirmation covers both
-  tabs until the page is left.
+- **„Kinder importieren", „Zugangsdaten" and „Konten" ask for the school's
+  password before they open**, by the same means and for the same reason: the
+  import brings personal data in from outside, the other two hold the keys to the
+  school, and a 30-day session cookie may not be what opens any of them.
+  `PASSWORD_TABS` in [`src/views/Admin.tsx`](src/views/Admin.tsx) names them, the
+  prompt is [`src/PasswordGate.tsx`](src/PasswordGate.tsx), and one confirmation
+  covers all three until the page is left. „Konten" is visible in api mode but
+  shows the roster only to an owner; a signed-in admin sees a short note there.
 - **The confirmed password is handed to the credential forms**, so „Passwort
   ändern" asks for the new password only and „Lehrkraft-PIN ändern" for the new
   PIN. The server still requires the current password in the body; the gate has
@@ -114,13 +127,26 @@ Consequences worth knowing before touching this:
 - **Deleting a class is the one PIN-level deletion that takes children with it**,
   so its confirm names their number instead of saying „samt allen Kindern".
 - **`POST /api/change-pin`, `/api/change-password` and `/api/verify-password` all
-  check the admin password in the body**, which is why they sit on the PIN level:
-  the password is the proof, and a login in front of them would ask for the same
-  secret twice. The PIN cannot promote itself that way, since changing it needs
-  the password. `verify-password` answers the question and changes nothing: no
-  cookie, no config write. The price is that password guessing is reachable with
-  the PIN, so all three share one throttle: five failures per board per 15
-  minutes, in memory, cleared on success.
+  check a password in the body against the signed-in account**, so they need the
+  `rb_admin` cookie (a PIN-only device is refused). The cookie says who you are,
+  the body password proves it is still you at a device whose cookies outlive a
+  school day. `change-password` sets that account's own password; `change-pin`
+  sets the school-wide teacher PIN; `verify-password` answers the question and
+  changes nothing (no cookie, no write). All three share one throttle: five
+  failures per board per 15 minutes, in memory, cleared on success.
+- **The roster lives under `/api/accounts/*` behind an owner guard**, stricter
+  than `/api/admin/*` (which any account passes). `GET` lists, `POST` creates and
+  returns a generated password once, `PATCH /:id` changes role or active state,
+  `POST /:id/reset-password` issues a new one. Two invariants the server enforces
+  (the UI mirrors them as disabled controls): the school keeps at least one active
+  owner, and an owner cannot demote or deactivate their own account. New and reset
+  passwords are generated and shown once; no plaintext is stored.
+- **The `rb_admin` token carries the account id** (`tenant.admin.<id>.<exp>`),
+  where the board token stays `tenant.board.<exp>`. Shipping this invalidated the
+  old admin cookies once (a format change), so admins signed in again; board/PIN
+  unlocks were untouched. A build before the `users` table adopts a school's
+  single `config` login as the first `owner` on the next open (migration
+  `0002_users.sql`), so nothing has to be re-provisioned.
 - **`POST /api/logout` ends the admin session only, `POST /api/lock` drops both
   cookies.** „Abmelden" on the start page must not lock the whiteboard a class
   books on. „Dieses Gerät sperren" in the Zugangsdaten tab is the `lock` call.
@@ -130,15 +156,21 @@ Consequences worth knowing before touching this:
   device means `POST /api/lock` from it, so a „reset all devices" feature would
   need a tenant-wide token epoch first.
 
-[`server/access.test.ts`](server/access.test.ts) drives the whole matrix through
+[`server/access.test.ts`](server/access.test.ts) drives the level matrix through
 the real app: no cookie changes nothing, the PIN opens the Verwaltung and is
-refused by the import, the password check that changes nothing, the credential
-endpoints and their shared throttle, and which cookie each sign-off clears. It
-imports `app` from `server/index.ts` with
-`RAUMBOARD_NO_LISTEN=1`, which is what stops that import from binding a port.
+refused by the import, the credential endpoints need an account and share a
+throttle, and which cookie each sign-off clears.
+[`server/accounts.test.ts`](server/accounts.test.ts) drives the roster: owner
+adds and lists, the password is returned once, a duplicate is refused, an admin
+is refused the roster but does the import, the last-owner and self guards hold,
+deactivation kills the cookie at once, and the migration adopts a legacy login as
+the owner. Both import `app` from `server/index.ts` with `RAUMBOARD_NO_LISTEN=1`,
+which is what stops that import from binding a port.
 
 Provisioning and recovery live in [`server/cli.ts`](server/cli.ts) and print the
-secrets to stdout only.
+secrets to stdout only: `create-school` makes the first owner, `reset-credentials`
+resets the PIN and the first owner's password, `add-account <slug> <email>
+[--owner]` adds a further account.
 
 ## Status / roadmap
 

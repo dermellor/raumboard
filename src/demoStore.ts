@@ -218,4 +218,18 @@ export const demoStore: BoardStore = {
     return { ok: false as const, reason: 'Im Demo-Modus nicht verfügbar' }
   },
   async lockDevice() {},
+
+  // no accounts in the offline demo store — the „Konten" tab is api-mode only
+  async listAccounts() {
+    return []
+  },
+  async createAccount() {
+    return { ok: false as const, reason: 'Im Demo-Modus nicht verfügbar' }
+  },
+  async updateAccount() {
+    return { ok: false as const, reason: 'Im Demo-Modus nicht verfügbar' }
+  },
+  async resetAccountPassword() {
+    return { ok: false as const, reason: 'Im Demo-Modus nicht verfügbar' }
+  },
 }

@@ -1,4 +1,4 @@
-import { createHmac, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto'
+import { createHmac, randomBytes, randomInt, scryptSync, timingSafeEqual } from 'node:crypto'
 
 // scrypt for password/PIN hashes (memory-hard, built into node), HMAC-signed
 // stateless tokens for cookies. No session storage.
@@ -32,6 +32,23 @@ export function verifySecret(plain: string, stored: string): boolean {
   return actual.length === expected.length && timingSafeEqual(actual, expected)
 }
 
+// --- generated secrets ------------------------------------------------------
+//
+// New and reset passwords are generated and shown once (no plaintext is stored),
+// so they have to be readable enough to dictate over the phone. Shared by the
+// CLI and the in-app account routes so both hand out the same shape.
+
+export function generatePassword(): string {
+  // 3 blocks of 4 lowercase alnum, ambiguous characters left out
+  const alphabet = 'abcdefghjkmnpqrstuvwxyz23456789'
+  const block = () => Array.from(randomBytes(4), (b) => alphabet[b % alphabet.length]).join('')
+  return `${block()}-${block()}-${block()}`
+}
+
+export function generatePin(): string {
+  return String(randomInt(0, 1000000)).padStart(6, '0')
+}
+
 // --- signed tokens --------------------------------------------------------
 
 export type TokenKind = 'admin' | 'board'
@@ -57,4 +74,36 @@ export function verifyToken(token: string | undefined, tenant: string, kind: Tok
     return false
   const [t, k, expStr] = payload.split('.')
   return t === tenant && k === kind && Number(expStr) > Date.now() / 1000
+}
+
+// --- admin tokens (carry the account id) -----------------------------------
+//
+// A school can have several accounts now, so the admin cookie has to say *which*
+// one. The board token stays the plain `tenant.board.exp` above (nothing about a
+// device is per-account); the admin token adds the account id as a fourth field.
+// Neither a slug nor the id contains a dot, so the payload splits unambiguously.
+
+export function makeAdminToken(tenant: string, userId: string, ttlSeconds: number): string {
+  const exp = Math.floor(Date.now() / 1000) + ttlSeconds
+  const payload = `${tenant}.admin.${userId}.${exp}`
+  return `${payload}.${sign(payload)}`
+}
+
+/** The account id a valid admin token carries, or null. Existence/active state
+ * is re-checked against the database by the caller, so a deactivated account's
+ * still-signed cookie stops working immediately. */
+export function verifyAdminToken(token: string | undefined, tenant: string): string | null {
+  if (!token) return null
+  const idx = token.lastIndexOf('.')
+  if (idx < 0) return null
+  const payload = token.slice(0, idx)
+  const sig = token.slice(idx + 1)
+  const expected = sign(payload)
+  if (sig.length !== expected.length || !timingSafeEqual(Buffer.from(sig), Buffer.from(expected)))
+    return null
+  const parts = payload.split('.')
+  if (parts.length !== 4) return null
+  const [t, k, userId, expStr] = parts
+  if (t !== tenant || k !== 'admin' || !(Number(expStr) > Date.now() / 1000)) return null
+  return userId
 }

@@ -1,12 +1,15 @@
 import {
   Ban, Baby, CircleCheck, FileUp, Hash, KeyRound, LayoutGrid, Lock, Plus,
-  School, Settings, Sprout, Trash2, Upload, Users,
+  School, Settings, Sprout, Trash2, Upload, UserCog, Users,
 } from 'lucide-react'
-import { lazy, Suspense, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import {
-  addKid, addKlass, addRoom, changePassword, changePin, lockDevice, occupancy,
-  removeKid, removeKlass, removeRoom, reseed, updateKid, updateKlass, updateRoom,
+  addKid, addKlass, addRoom, changePassword, changePin, createAccount, listAccounts,
+  lockDevice, occupancy, removeKid, removeKlass, removeRoom, reseed, resetAccountPassword,
+  updateAccount, updateKid, updateKlass, updateRoom,
 } from '../store'
+import type { AuthResult } from '../store'
+import type { Account, Role } from '../types'
 import { EmojiButton } from '../EmojiButton'
 import { Modal, TopBar } from '../components'
 import { PasswordGate } from '../PasswordGate'
@@ -27,15 +30,20 @@ const TABS = [
   { key: 'kinder', label: 'Kinder', icon: <Baby /> },
   { key: 'import', label: 'Kinder importieren', icon: <Upload /> },
   { key: 'zugang', label: 'Zugangsdaten', icon: <KeyRound /> },
+  { key: 'konten', label: 'Konten', icon: <UserCog /> },
 ] as const
 type TabKey = (typeof TABS)[number]['key']
 
+/** Tabs that only make sense against the server (api mode), never in the demo. */
+const API_ONLY_TABS: TabKey[] = ['zugang', 'konten']
+
 /**
- * The two tabs that ask for the school's password before they open: one brings
- * personal data in from outside, the other holds the keys to the whole school.
- * The teacher PIN in front of the page is not enough for either.
+ * The tabs that ask for the school's password before they open: the import
+ * brings personal data in from outside, „Zugangsdaten" holds the keys to the
+ * school, and „Konten" is the account roster. The teacher PIN in front of the
+ * page is not enough for any of them.
  */
-const PASSWORD_TABS: TabKey[] = ['import', 'zugang']
+const PASSWORD_TABS: TabKey[] = ['import', 'zugang', 'konten']
 
 /**
  * `password` is the one the gate in front of this tab has just confirmed, so
@@ -139,6 +147,171 @@ function CredentialsSection({ password }: { password: string }) {
   )
 }
 
+/**
+ * The account roster, owner only. The two server invariants are mirrored here as
+ * disabled controls (the server still enforces them): the school keeps at least
+ * one active owner, and an owner does not demote or deactivate their own account.
+ * New and reset passwords are shown once, since none is stored in the clear.
+ */
+function AccountsSection() {
+  const meta = useMeta()
+  const isOwner = meta.account?.role === 'owner'
+  const me = meta.account?.email
+  const [accounts, setAccounts] = useState<Account[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [addOpen, setAddOpen] = useState(false)
+  const [newEmail, setNewEmail] = useState('')
+  const [newRole, setNewRole] = useState<Role>('admin')
+  // a generated password to show exactly once, for a new or reset account
+  const [shown, setShown] = useState<{ email: string; password: string } | null>(null)
+
+  const load = () => void listAccounts().then(setAccounts)
+  useEffect(() => {
+    if (isOwner) load()
+  }, [isOwner])
+
+  if (!isOwner)
+    return (
+      <section>
+        <p className="count">Die Kontenverwaltung ist nur für Inhaber-Konten.</p>
+      </section>
+    )
+
+  const activeOwners = (accounts ?? []).filter((a) => a.role === 'owner' && a.active).length
+
+  const run = (p: Promise<AuthResult>) => {
+    setError(null)
+    void p.then((r) => {
+      if (!r.ok) setError(r.reason)
+      load()
+    })
+  }
+
+  const submitAdd = async () => {
+    setError(null)
+    const r = await createAccount(newEmail.trim(), newRole)
+    if (!r.ok) return setError(r.reason)
+    setAddOpen(false)
+    setNewEmail('')
+    setNewRole('admin')
+    setShown({ email: r.account.email, password: r.password })
+    load()
+  }
+
+  const resetPw = async (a: Account) => {
+    setError(null)
+    const r = await resetAccountPassword(a.id)
+    if (!r.ok) return setError(r.reason)
+    setShown({ email: a.email, password: r.password })
+  }
+
+  return (
+    <section>
+      <table>
+        <thead>
+          <tr>
+            <th>E-Mail</th><th>Rolle</th><th>Status</th><th>Anmeldung</th>
+            <th className="th-add">
+              <button
+                className="add"
+                aria-label="Konto hinzufügen"
+                onClick={() => {
+                  setError(null)
+                  setAddOpen(true)
+                }}
+              >
+                <Plus />
+              </button>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {(accounts ?? []).map((a) => {
+            const self = a.email === me
+            // the two cases the server refuses, disabled here too
+            const protectedOwner = a.role === 'owner' && (self || activeOwners <= 1)
+            return (
+              <tr key={a.id} className={a.active ? undefined : 'closed'}>
+                <td>{a.email}{self && ' (Sie)'}</td>
+                <td>
+                  <select
+                    value={a.role}
+                    disabled={protectedOwner}
+                    onChange={(e) => run(updateAccount(a.id, { role: e.target.value as Role }))}
+                  >
+                    <option value="owner">Inhaber</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </td>
+                <td>{a.active ? 'aktiv' : 'deaktiviert'}</td>
+                <td>
+                  <button
+                    className="toggle"
+                    disabled={a.active && protectedOwner}
+                    onClick={() => run(updateAccount(a.id, { active: !a.active }))}
+                  >
+                    {a.active ? (
+                      <><Ban className="icon-amber" /> Deaktivieren</>
+                    ) : (
+                      <><CircleCheck className="icon-green" /> Aktivieren</>
+                    )}
+                  </button>
+                </td>
+                <td className="td-right">
+                  <button onClick={() => void resetPw(a)}>
+                    <KeyRound /> Passwort zurücksetzen
+                  </button>
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+      {error && <p className="form-error">{error}</p>}
+
+      {addOpen && (
+        <Modal title="Konto hinzufügen" onClose={() => setAddOpen(false)}>
+          <div className="field">
+            <label htmlFor="acc-email">E-Mail</label>
+            <input
+              id="acc-email"
+              type="email"
+              autoFocus
+              autoComplete="off"
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="acc-role">Rolle</label>
+            <select id="acc-role" value={newRole} onChange={(e) => setNewRole(e.target.value as Role)}>
+              <option value="admin">Admin</option>
+              <option value="owner">Inhaber</option>
+            </select>
+          </div>
+          {error && <p className="form-error">{error}</p>}
+          <button disabled={!newEmail.trim()} onClick={() => void submitAdd()}>
+            anlegen
+          </button>
+        </Modal>
+      )}
+
+      {shown && (
+        <Modal title="Passwort" onClose={() => setShown(null)}>
+          <p>
+            Passwort für <strong>{shown.email}</strong>. Es wird nur jetzt angezeigt, bitte
+            notieren und persönlich weitergeben.
+          </p>
+          <p className="field">
+            <code>{shown.password}</code>
+          </p>
+          <button onClick={() => setShown(null)}>fertig</button>
+        </Modal>
+      )}
+    </section>
+  )
+}
+
 export function Admin() {
   const state = useBoard()
   const meta = useMeta()
@@ -195,7 +368,7 @@ export function Admin() {
       </div>
 
       <nav className="tabbar">
-        {TABS.filter((t) => t.key !== 'zugang' || meta.mode === 'api').map((t) => (
+        {TABS.filter((t) => !API_ONLY_TABS.includes(t.key) || meta.mode === 'api').map((t) => (
           <button
             key={t.key}
             className={tab === t.key ? 'active' : undefined}
@@ -258,6 +431,8 @@ export function Admin() {
       )}
 
       {tab === 'zugang' && meta.mode === 'api' && <CredentialsSection password={confirmed ?? ''} />}
+
+      {tab === 'konten' && meta.mode === 'api' && <AccountsSection />}
 
       {tab === 'raeume' && (
       <section>

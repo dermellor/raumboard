@@ -28,3 +28,14 @@ export type BoardState = {
 }
 
 export type BookResult = { ok: true } | { ok: false; reason: string }
+
+// An admin account of a school (login level, never a child). `owner` manages
+// accounts and does everything an `admin` does; `admin` does the import and its
+// own credentials. Deactivating instead of deleting keeps it reversible.
+export type Role = 'owner' | 'admin'
+export type Account = {
+  id: string
+  email: string
+  role: Role
+  active: boolean
+}

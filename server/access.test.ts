@@ -1,6 +1,7 @@
-// The two access levels are the thing worth testing here: the teacher PIN opens
-// the whole Verwaltung, the login opens the import and nothing else needs it.
-// Env has to be set before the modules read it, so they are imported below.
+// The access levels are the thing worth testing here: the teacher PIN opens the
+// Verwaltung (rooms/classes/kids), a signed-in account opens the import and the
+// account's own credentials, and an owner account opens the roster. Env has to
+// be set before the modules read it, so they are imported below.
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -26,8 +27,7 @@ const { buildSeed } = await import('../src/seed')
 
 const db = openTenant(TENANT, { create: true })
 board.replaceAll(db, buildSeed())
-board.setConfig(db, 'admin_email', EMAIL)
-board.setConfig(db, 'admin_hash', hashSecret(PASSWORD))
+board.createUser(db, EMAIL, hashSecret(PASSWORD), 'owner')
 board.setConfig(db, 'pin_hash', hashSecret(PIN))
 board.setConfig(db, 'pin_length', String(PIN.length))
 
@@ -151,23 +151,26 @@ test('the import is the one thing the PIN does not open', async () => {
   assert.ok(board.loadState(db).kids.some((k) => k.name === 'Import I.'))
 })
 
-test('the password can be confirmed without changing anything', async () => {
-  const cookies = { rb_board: await pinCookie() }
-  const before = board.getConfig(db, 'admin_hash')
+test('verifying the password needs a signed-in account and changes nothing', async () => {
+  // the PIN alone does not reach it any more: it is tied to a specific account
+  const pinOnly = await call('POST', '/verify-password', {
+    cookies: { rb_board: await pinCookie() },
+    body: { password: PASSWORD },
+  })
+  assert.equal(pinOnly.status, 401)
 
+  const cookies = { rb_admin: await adminCookie() }
   const wrong = await call('POST', '/verify-password', { cookies, body: { password: 'falsch' } })
   assert.equal(wrong.status, 401)
 
   const ok = await call('POST', '/verify-password', { cookies, body: { password: PASSWORD } })
   assert.equal(ok.status, 200)
-  // it is a question, not a change: no cookie, no config touched
+  // it is a question, not a change: no cookie set
   assert.equal(ok.headers.getSetCookie().length, 0)
-  assert.equal(board.getConfig(db, 'admin_hash'), before)
 })
 
-test('the credential forms verify the password themselves, no login in front', async () => {
-  const rb_board = await pinCookie()
-  const cookies = { rb_board }
+test('the credential forms verify against the signed-in account', async () => {
+  const cookies = { rb_admin: await adminCookie() }
 
   const wrong = await call('POST', '/change-pin', { cookies, body: { password: 'falsch', pin: '9999' } })
   assert.equal(wrong.status, 401)
@@ -197,8 +200,8 @@ test('signing out of the account leaves the device unlocked', async () => {
 })
 
 // last: the throttle blocks this board for 15 minutes once it trips
-test('password guessing on the PIN level is throttled', async () => {
-  const cookies = { rb_board: await pinCookie() }
+test('password guessing on the credential endpoints is throttled', async () => {
+  const cookies = { rb_admin: await adminCookie() }
   for (let i = 0; i < 5; i++) {
     const res = await call('POST', '/change-password', {
       cookies,

@@ -43,4 +43,8 @@ export const {
   changePassword,
   changePin,
   lockDevice,
+  listAccounts,
+  createAccount,
+  updateAccount,
+  resetAccountPassword,
 } = store
