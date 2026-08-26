@@ -777,6 +777,12 @@ h1 {
   text-align: center;
 }
 
+/* demo boards name their published PIN here instead of filling it in */
+.pin-hint {
+  text-align: center;
+  font-weight: 700;
+}
+
 /* segmented PIN: one box per digit, so the number of digits is visible */
 .pin-slots {
   position: relative;

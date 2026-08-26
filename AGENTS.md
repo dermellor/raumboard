@@ -382,10 +382,18 @@ which is what keeps two visitors apart without a second code path.
 Credentials and school name come from `RAUMBOARD_DEMO_LOGIN` / `_PASSWORD` /
 `_PIN` / `_NAME`, defaulting to `demo@raumboard.de` / `raumboard-demo` / `1234` /
 „Demoschule". On a demo board `/api/state` returns them as `meta.demoCredentials`
-(null for a school), and the login form and the PIN gate prefill themselves from
-it: a visitor came to see the product, not to copy credentials off a website. The
-gate still has to be confirmed, so both steps stay visible — filling the slots
-programmatically does not submit them. `npm test` covers the isolation, the empty data directory, the
+(null for a school), and the login form and the boards' PIN gate prefill
+themselves from it: a visitor came to see the product, not to copy credentials
+off a website. The gate still has to be confirmed, so both steps stay visible,
+since filling the slots programmatically does not submit them.
+
+**The Verwaltung's PIN gate is the exception: it prints the PIN above empty
+slots instead of filling them** (`demoPin="hint"`, [`src/PinGate.tsx`](src/PinGate.tsx)).
+There the gate is the thing being demonstrated, and a prefilled field would put
+the Verwaltung one click away, which is the opposite of what the demo should
+show. Typing four digits is not what stands between a visitor and the product.
+
+`npm test` covers the isolation, the empty data directory, the
 reset, expiry and both startup refusals
 ([`server/demo.test.ts`](server/demo.test.ts)).
 

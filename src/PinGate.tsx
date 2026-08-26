@@ -19,18 +19,27 @@ export function PinGate({
   onSuccess = onClose,
   title = 'Lehrkraft-PIN',
   intro = 'Dieses Gerät ist noch gesperrt. Eine Lehrkraft gibt einmalig die PIN ein, danach kann hier gebucht werden.',
+  demoPin = 'prefill',
 }: {
   onClose: () => void
   onSuccess?: () => void
   title?: string
   intro?: string
+  /**
+   * What a demo board does with its published PIN. Boards prefill it, so a
+   * visitor reaches the product without copying credentials off a website.
+   * The Verwaltung shows it instead: there the gate is the thing being
+   * demonstrated, and a filled field would hide it behind one click.
+   */
+  demoPin?: 'prefill' | 'hint'
 }) {
   const meta = useMeta()
   const length = meta.pinLength ?? null
   const inputRef = useRef<HTMLInputElement>(null)
-  // the demo prefills its own PIN; filling the slots does not submit, so the
-  // gate still has to be confirmed and stays part of what a visitor sees
-  const [pin, setPin] = useState(meta.demoCredentials?.pin ?? '')
+  const demoValue = meta.demoCredentials?.pin ?? null
+  // filling the slots does not submit, so the gate still has to be confirmed
+  // and stays part of what a visitor sees
+  const [pin, setPin] = useState(demoPin === 'prefill' ? (demoValue ?? '') : '')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -60,6 +69,7 @@ export function PinGate({
   return (
     <Modal title={title} onClose={onClose}>
       <p>{intro}</p>
+      {demoPin === 'hint' && demoValue && <p className="pin-hint">PIN dieser Demo: {demoValue}</p>}
 
       {slots ? (
         <div className="pin-slots" onClick={() => inputRef.current?.focus()}>

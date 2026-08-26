@@ -170,6 +170,7 @@ export function Admin() {
         <TopBar title="Verwaltung" />
         <PinGate
           intro="Die Verwaltung ist nur für Lehrkräfte. Bitte die PIN eingeben."
+          demoPin="hint"
           onSuccess={() => setUnlocked(true)}
           onClose={() => {
             window.location.hash = '#/'
