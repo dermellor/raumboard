@@ -9,7 +9,7 @@ import {
   updateAccount, updateKid, updateKlass, updateRoom,
 } from '../store'
 import type { AuthResult } from '../store'
-import type { Account, Role } from '../types'
+import type { Account, Kid, Role } from '../types'
 import { EmojiButton } from '../EmojiButton'
 import { Modal, TopBar } from '../components'
 import { PasswordGate } from '../PasswordGate'
@@ -23,6 +23,33 @@ const ImportWizard = lazy(() =>
 )
 
 type AdminModal = 'room' | 'klass' | 'kid' | null
+
+/**
+ * The child's name, editable inline like its symbol and class next to it. Local
+ * state so typing does not fire a request per keystroke; it commits on blur and
+ * on Enter, and an emptied field reverts rather than clearing the name.
+ */
+function KidNameField({ kid }: { kid: Kid }) {
+  const [value, setValue] = useState(kid.name)
+  useEffect(() => setValue(kid.name), [kid.name])
+  const commit = () => {
+    const name = value.trim()
+    if (!name) return setValue(kid.name)
+    if (name !== kid.name) updateKid(kid.id, { name })
+  }
+  return (
+    <input
+      className="kid-name"
+      value={value}
+      aria-label={`Name von ${kid.name}`}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.currentTarget.blur()
+      }}
+    />
+  )
+}
 
 const TABS = [
   { key: 'raeume', label: 'Räume', icon: <LayoutGrid /> },
@@ -588,7 +615,7 @@ export function Admin() {
                           label={`Symbol für ${k.name}`}
                           onChange={(symbol) => updateKid(k.id, { symbol })}
                         />{' '}
-                        {k.name}
+                        <KidNameField kid={k} />
                       </td>
                       <td>
                         <select
