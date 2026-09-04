@@ -900,7 +900,7 @@ h1 {
   margin-block: 0.15rem;
 }
 
-.admin td input.kid-name {
+.admin td input.inline-name {
   width: 12rem;
   max-width: 100%;
 }
