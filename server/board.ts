@@ -31,7 +31,7 @@ export function loadState(db: Database.Database): BoardState {
       emoji: r.emoji,
       capacity: r.capacity,
       isOpen: !!r.is_open,
-      scope: r.scope,
+      scope: scopeFromDb(r.scope),
     }),
   )
   return { klasses, kids, rooms }
@@ -144,6 +144,41 @@ export function setUserPassword(db: Database.Database, id: string, passHash: str
   db.prepare('UPDATE users SET pass_hash = ? WHERE id = ?').run(passHash, id)
 }
 
+// --- scope -------------------------------------------------------------------
+
+// A scope list is stored as one JSON column value ('all' or '["1a","2b"]'),
+// so multi-class rooms need no join table. Reading is tolerant on purpose: a
+// bare klassId (the pre-0003 shape, or an old client's write) is a one-element
+// list, so no serving path can produce a room nobody may book by accident.
+export function scopeFromDb(raw: string): Room['scope'] {
+  if (raw === 'all') return 'all'
+  if (raw.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) return parsed.filter((x): x is string => typeof x === 'string')
+    } catch {
+      // fall through to the legacy single-id reading
+    }
+  }
+  return [raw]
+}
+
+export function scopeToDb(scope: Room['scope']): string {
+  return scope === 'all' ? 'all' : JSON.stringify(scope)
+}
+
+/** What a client may send: 'all', a single klassId (old clients), or an array
+ *  of klassIds. Anything else is 'all' — a room is never silently unusable. */
+export function normalizeScope(value: unknown): Room['scope'] {
+  if (value === 'all') return 'all'
+  if (typeof value === 'string') return value ? [value] : 'all'
+  if (Array.isArray(value)) {
+    const ids = value.filter((x): x is string => typeof x === 'string' && x !== '')
+    return ids.length ? ids : 'all'
+  }
+  return 'all'
+}
+
 // --- booking ---------------------------------------------------------------
 
 export function book(db: Database.Database, kidId: string, roomId: string): BookResult {
@@ -193,14 +228,14 @@ export function addRoom(
   name: string,
   emoji: string,
   capacity: number,
-  scope: string,
+  scope: Room['scope'],
 ): void {
   db.prepare('INSERT INTO rooms (id, name, emoji, capacity, is_open, scope) VALUES (?, ?, ?, ?, 1, ?)').run(
     slugId(db, name),
     name,
     emoji,
     Math.max(0, capacity),
-    scope,
+    scopeToDb(scope),
   )
 }
 
@@ -210,7 +245,7 @@ export function updateRoom(db: Database.Database, roomId: string, patch: Partial
   if (patch.emoji !== undefined) fields.emoji = patch.emoji
   if (patch.capacity !== undefined) fields.capacity = Math.max(0, patch.capacity)
   if (patch.isOpen !== undefined) fields.is_open = patch.isOpen ? 1 : 0
-  if (patch.scope !== undefined) fields.scope = patch.scope
+  if (patch.scope !== undefined) fields.scope = scopeToDb(normalizeScope(patch.scope))
   const keys = Object.keys(fields)
   if (!keys.length) return
   const sets = keys.map((k) => `${k} = ?`).join(', ')
@@ -240,7 +275,7 @@ export function updateKid(
 ): void {
   db.transaction(() => {
     if (patch.klassId !== undefined) {
-      // moving class: a booking in a class-bound room of the old class is no
+      // moving class: a booking in a room the new class may not use is no
       // longer legal → back to the classroom (mirrors demo store)
       const kid = db.prepare('SELECT klass_id, current_room_id FROM kids WHERE id = ?').get(kidId) as
         | { klass_id: string; current_room_id: string | null }
@@ -249,7 +284,8 @@ export function updateKid(
         const room = db.prepare('SELECT scope FROM rooms WHERE id = ?').get(kid.current_room_id) as
           | { scope: string }
           | undefined
-        if (room && room.scope !== 'all' && room.scope !== patch.klassId)
+        const scope = room ? scopeFromDb(room.scope) : undefined
+        if (scope && scope !== 'all' && !scope.includes(patch.klassId))
           db.prepare('UPDATE kids SET current_room_id = NULL WHERE id = ?').run(kidId)
       }
       db.prepare('UPDATE kids SET klass_id = ? WHERE id = ?').run(patch.klassId, kidId)
@@ -342,7 +378,21 @@ export function updateKlass(
 export function removeKlass(db: Database.Database, klassId: string): void {
   db.transaction(() => {
     db.prepare('DELETE FROM kids WHERE klass_id = ?').run(klassId)
-    db.prepare('DELETE FROM rooms WHERE scope = ?').run(klassId)
+    // the class leaves every scope list; a room that ends up with none goes
+    // with it, and kids booked there return to their classroom
+    const rooms = db.prepare('SELECT id, scope FROM rooms').all() as { id: string; scope: string }[]
+    for (const room of rooms) {
+      const scope = scopeFromDb(room.scope)
+      if (scope === 'all') continue
+      const next = scope.filter((id) => id !== klassId)
+      if (next.length === scope.length) continue
+      if (next.length === 0) {
+        db.prepare('UPDATE kids SET current_room_id = NULL WHERE current_room_id = ?').run(room.id)
+        db.prepare('DELETE FROM rooms WHERE id = ?').run(room.id)
+      } else {
+        db.prepare('UPDATE rooms SET scope = ? WHERE id = ?').run(scopeToDb(next), room.id)
+      }
+    }
     db.prepare('DELETE FROM klasses WHERE id = ?').run(klassId)
   })()
 }
@@ -362,6 +412,6 @@ export function replaceAll(db: Database.Database, state: BoardState): void {
     )
     for (const c of state.klasses) insKlass.run(c.id, c.name, c.emoji ?? null)
     for (const k of state.kids) insKid.run(k.id, k.klassId, k.symbol, k.name, k.currentRoomId)
-    for (const r of state.rooms) insRoom.run(r.id, r.name, r.emoji, r.capacity, r.isOpen ? 1 : 0, r.scope)
+    for (const r of state.rooms) insRoom.run(r.id, r.name, r.emoji, r.capacity, r.isOpen ? 1 : 0, scopeToDb(r.scope))
   })()
 }

@@ -199,6 +199,55 @@ test('signing out of the account leaves the device unlocked', async () => {
   assert.equal(cookieFrom(locked, 'rb_board'), '')
 })
 
+test('a room may serve several classes', async () => {
+  const rb_board = await pinCookie()
+  const cookies = { rb_board }
+  const klassId = (name: string) => board.loadState(db).klasses.find((k) => k.name === name)!.id
+  const kidOf = (klassId: string) =>
+    board.loadState(db).kids.find((k) => k.klassId === klassId && k.currentRoomId === null)!
+
+  const created = await call('POST', '/rooms', {
+    cookies,
+    body: { name: 'Cluster-Ecke', emoji: '🧩', capacity: 4, scope: [klassId('1A'), klassId('1B')] },
+  })
+  assert.equal(created.status, 200)
+  const room = board.loadState(db).rooms.find((r) => r.name === 'Cluster-Ecke')!
+  assert.deepEqual(room.scope, [klassId('1A'), klassId('1B')])
+
+  // both member classes may book, a third one is refused
+  const inA = await call('POST', '/book', { cookies, body: { kidId: kidOf(klassId('1A')).id, roomId: room.id } })
+  assert.equal(inA.status, 200)
+  const inB = await call('POST', '/book', { cookies, body: { kidId: kidOf(klassId('1B')).id, roomId: room.id } })
+  assert.equal(inB.status, 200)
+  const refused = await call('POST', '/book', { cookies, body: { kidId: kidOf(klassId('2A')).id, roomId: room.id } })
+  assert.equal(refused.status, 409)
+
+  // the old single-string shape (a pre-list client) still works
+  const patched = await call('PATCH', `/rooms/${room.id}`, { cookies, body: { scope: klassId('1A') } })
+  assert.equal(patched.status, 200)
+  assert.deepEqual(board.loadState(db).rooms.find((r) => r.id === room.id)!.scope, [klassId('1A')])
+})
+
+test('deleting a class trims the scope lists and drops emptied rooms', async () => {
+  const rb_board = await pinCookie()
+  const cookies = { rb_board }
+
+  for (const name of ['5A', '5B'])
+    assert.equal((await call('POST', '/klasses', { cookies, body: { name } })).status, 200)
+  const id5A = board.loadState(db).klasses.find((k) => k.name === '5A')!.id
+  const id5B = board.loadState(db).klasses.find((k) => k.name === '5B')!.id
+
+  for (const [name, scope] of [['Nur 5A', [id5A]], ['Beide', [id5A, id5B]]] as const) {
+    const res = await call('POST', '/rooms', { cookies, body: { name, emoji: '🧩', capacity: 3, scope } })
+    assert.equal(res.status, 200)
+  }
+
+  assert.equal((await call('DELETE', `/klasses/${id5A}`, { cookies })).status, 200)
+  const after = board.loadState(db)
+  assert.ok(!after.rooms.some((r) => r.name === 'Nur 5A'), 'room scoped to only 5A goes with the class')
+  assert.deepEqual(after.rooms.find((r) => r.name === 'Beide')!.scope, [id5B], '5B is kept')
+})
+
 // last: the throttle blocks this board for 15 minutes once it trips
 test('password guessing on the credential endpoints is throttled', async () => {
   const cookies = { rb_admin: await adminCookie() }

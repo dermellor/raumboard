@@ -41,7 +41,7 @@ export function RoomPicker({ kid, onClose }: { kid: Kid; onClose: () => void }) 
             <span className="name">Eigenes Klassenzimmer</span>
           </button>
           {state.rooms
-            .filter((r) => r.scope === 'all' || r.scope === kid.klassId)
+            .filter((r) => r.scope === 'all' || r.scope.includes(kid.klassId))
             .map((room) => {
               const check = canBook(kid, room, state)
               const here = kid.currentRoomId === room.id

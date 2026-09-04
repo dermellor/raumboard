@@ -324,7 +324,7 @@ api.post('/admin/import', async (c) => {
 api.post('/rooms', async (c) => {
   const { name, emoji, capacity, scope } = await c.req.json()
   if (!name?.trim()) return c.json({ error: 'name fehlt' }, 400)
-  board.addRoom(openBoard(c.get('boardId')), name.trim(), emoji || '🚪', Number(capacity) || 0, scope || 'all')
+  board.addRoom(openBoard(c.get('boardId')), name.trim(), emoji || '🚪', Number(capacity) || 0, board.normalizeScope(scope))
   broadcast(c.get('boardId'), stateMessage(c.get('boardId')))
   return c.json({ ok: true })
 })

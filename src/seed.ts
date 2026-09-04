@@ -61,15 +61,26 @@ function buildRooms(): Room[] {
     { id: 'foyer', name: 'Foyer', emoji: '🪑', capacity: 6, isOpen: true, scope: 'all' },
     { id: 'garten', name: 'Garten', emoji: '🌳', capacity: 10, isOpen: false, scope: 'all' },
   ]
-  const flure: Room[] = KLASS_NAMES.map((name) => ({
-    id: `flur-${klassId(name)}`,
-    name: `Flur ${name}`,
+  // the third grade shares one cluster, so its two classes also share the
+  // hallway desks — the case the scope list exists for
+  const flure: Room[] = KLASS_NAMES.filter((n) => n !== '3A' && n !== '3B')
+    .map((name) => ({
+      id: `flur-${klassId(name)}`,
+      name: `Flur ${name}`,
+      emoji: '🧩',
+      capacity: 3,
+      isOpen: true,
+      scope: [klassId(name)],
+    }))
+  const flur3: Room = {
+    id: 'flur-3',
+    name: 'Flur 3 (A+B)',
     emoji: '🧩',
-    capacity: 3,
+    capacity: 6,
     isOpen: true,
-    scope: klassId(name),
-  }))
-  return [...shared, ...flure]
+    scope: [klassId('3A'), klassId('3B')],
+  }
+  return [...shared, ...flure, flur3]
 }
 
 export function buildSeed(): BoardState {

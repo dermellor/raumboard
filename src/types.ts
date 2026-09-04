@@ -18,7 +18,9 @@ export type Room = {
   emoji: string
   capacity: number
   isOpen: boolean
-  scope: 'all' | string // klassId for class-bound rooms (hallway desks)
+  // which classes may book here: every class ('all', also future ones) or a
+  // list of klassIds (e.g. the two classes sharing one cluster's hallway desks)
+  scope: 'all' | string[]
 }
 
 export type BoardState = {

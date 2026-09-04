@@ -123,11 +123,11 @@ export const demoStore: BoardStore = {
       kids: state.kids.map((k) => {
         if (k.id !== kidId) return k
         const next = { ...k, ...patch }
-        // Moving to another class: a booking in the old class's hallway room
-        // is no longer legal → back to the classroom.
+        // Moving to another class: a booking in a room the new class may not
+        // use is no longer legal → back to the classroom.
         if (patch.klassId && patch.klassId !== k.klassId && k.currentRoomId) {
           const room = state.rooms.find((r) => r.id === k.currentRoomId)
-          if (room && room.scope !== 'all' && room.scope !== patch.klassId) next.currentRoomId = null
+          if (room && room.scope !== 'all' && !room.scope.includes(patch.klassId)) next.currentRoomId = null
         }
         return next
       }),
@@ -151,11 +151,22 @@ export const demoStore: BoardStore = {
   },
 
   removeKlass(klassId) {
+    // Rooms keep the other classes in their scope; one that ends up with an
+    // empty scope goes with the class, and kids booked there return home.
+    const dropped = new Set(
+      state.rooms
+        .filter((r) => r.scope !== 'all' && r.scope.length === 1 && r.scope[0] === klassId)
+        .map((r) => r.id),
+    )
     commit({
       ...state,
       klasses: state.klasses.filter((c) => c.id !== klassId),
-      kids: state.kids.filter((k) => k.klassId !== klassId),
-      rooms: state.rooms.filter((r) => r.scope !== klassId),
+      kids: state.kids
+        .filter((k) => k.klassId !== klassId)
+        .map((k) => (k.currentRoomId && dropped.has(k.currentRoomId) ? { ...k, currentRoomId: null } : k)),
+      rooms: state.rooms
+        .filter((r) => !dropped.has(r.id))
+        .map((r) => (r.scope === 'all' ? r : { ...r, scope: r.scope.filter((id) => id !== klassId) })),
     })
   },
 

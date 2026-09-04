@@ -211,8 +211,9 @@ success. Only `tsc -b`, inside `npm run build`, walks the three project referenc
   (UI icons — content emojis stay emojis). No router package (tiny hash router),
   no state package (own store).
 - `src/types.ts` — domain model: `Klass`, `Kid`, `Room`. `Kid.currentRoomId = null`
-  means "in own classroom". Room `scope` is `'all'` or a `klassId` (class-bound
-  hallway desks). Occupancy is always derived, never stored.
+  means "in own classroom". Room `scope` is `'all'` (every class, including
+  future ones) or a list of `klassId`s (class-bound hallway desks, shared
+  cluster rooms). Occupancy is always derived, never stored.
 - `src/store.ts` — booking rules + admin mutations behind a store interface
   (`getState`, `book`, `unbook`, `reset`, `subscribe`, admin CRUD). This interface
   is the contract for the Phase-2 API; only the implementation gets swapped.
@@ -272,8 +273,15 @@ rollback of a failing migration.
 ## Booking rules
 
 A kid can book into a room iff the room `isOpen`, has free capacity, and its
-`scope` is `'all'` or equals the kid's class. Booking out sets
+`scope` is `'all'` or contains the kid's class. Booking out sets
 `currentRoomId = null`. Global reset ("Feierabend-Reset") sets every kid to `null`.
+
+Deleting a class trims it from every room's scope list; a room whose list ends
+up empty goes with the class (kids booked there return to their classroom).
+The Verwaltung edits the scope through a dropdown anchored at the "Für" cell
+of the room table (checkbox rows, no emojis; while "Alle" is on the class
+rows show checked but grayed out); the add-room form carries the same rows
+inline.
 
 The reset is a daily action of the teaching staff, so it sits at the foot of the
 start page next to „Verwaltung" rather than inside it: it changes today's

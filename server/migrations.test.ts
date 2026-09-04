@@ -5,7 +5,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import Database from 'better-sqlite3'
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -145,4 +145,39 @@ test("the repository's own migration set is well-formed", () => {
   const files = migrationFiles(path.join(HERE, 'migrations'))
   assert.ok(files.length > 0, 'expected at least one migration file')
   assert.deepEqual(validateMigrationNames(files), [])
+})
+
+test('a legacy single-class scope becomes a one-element list', () => {
+  // The shape a school's database had before the scope list: 0001 applied
+  // (user_version = 1), rooms carrying a bare klassId in scope. Adoption marks
+  // 0001 as applied, 0002 and 0003 run against the existing rows.
+  const root = mkdtempSync(path.join(tmpdir(), 'lb-scope-'))
+  try {
+    const p = path.join(root, 'legacy-scope.db')
+    const seed = new Database(p)
+    seed.exec(readFileSync(path.join(HERE, 'migrations/0001_init.sql'), 'utf8'))
+    seed.pragma('user_version = 1')
+    seed.prepare("insert into klasses (id, name) values ('1a', '1A')").run()
+    seed.prepare(
+      "insert into rooms (id, name, emoji, capacity, is_open, scope) values ('r1', 'Flur', '🧩', 3, 1, '1a')",
+    ).run()
+    seed.prepare(
+      "insert into rooms (id, name, emoji, capacity, is_open, scope) values ('r2', 'Hof', '🌳', 3, 1, 'all')",
+    ).run()
+    seed.close()
+
+    const db = new Database(p)
+    migrate(db, 'legacy-scope', path.join(HERE, 'migrations'))
+    const scopes = Object.fromEntries(
+      (db.prepare('select id, scope from rooms').all() as { id: string; scope: string }[]).map((r) => [
+        r.id,
+        r.scope,
+      ]),
+    )
+    assert.equal(scopes['r1'], '["1a"]')
+    assert.equal(scopes['r2'], 'all')
+    db.close()
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
 })
