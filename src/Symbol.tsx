@@ -1,16 +1,8 @@
 import { OPENMOJI_HEX } from './emoji-assets'
+import { hexname } from './emoji-hex'
 import { useMeta } from './useBoard'
 
 const OPENMOJI = new Set(OPENMOJI_HEX)
-
-// OpenMoji file names drop the text-presentation selector (FE0F) and keep
-// everything else, including the ZWJ (200D) that joins sequences like 🐈‍⬛.
-// Keep in sync with scripts/fetch-openmoji.mjs.
-const hexname = (emoji: string): string =>
-  [...emoji]
-    .map((c) => c.codePointAt(0)!.toString(16).toUpperCase())
-    .filter((h) => h !== 'FE0F')
-    .join('-')
 
 /**
  * A symbol on the boards. With OpenMoji (the default) an emoji is rendered as a

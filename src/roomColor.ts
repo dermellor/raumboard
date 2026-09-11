@@ -1,35 +1,27 @@
 import type { CSSProperties } from 'react'
 import type { Room } from './types'
+import { hexname } from './emoji-hex'
+import { EMOJI_COLORS, type EmojiColor } from './emoji-assets'
 
-// Room accent colors are derived (not stored) so existing localStorage states
-// need no migration. Known rooms get their semantic color, everything else a
-// stable palette pick based on the id.
+// Room colors are derived from the room's symbol, never stored and never keyed
+// by room id: whatever a school names its rooms, a tile carries the color of
+// its emoji. The pairs are generated from the dominant fill of the OpenMoji
+// SVGs (scripts/fetch-openmoji.mjs → EMOJI_COLORS), so the OpenMoji artwork is
+// the single source of the palette. An emoji without an asset falls back to a
+// neutral pair, and class-bound rooms (hallway desks) stay gray to read as
+// "restricted", not as a learning place.
 
-export type RoomColor = { accent: string; tint: string }
+export type RoomColor = EmojiColor
 
-const PALETTE: RoomColor[] = [
-  { accent: '#0EA5E9', tint: '#E0F2FE' }, // sky
-  { accent: '#F59E0B', tint: '#FEF3C7' }, // amber
-  { accent: '#8B5CF6', tint: '#EDE9FE' }, // violet
-  { accent: '#EC4899', tint: '#FCE7F3' }, // pink
-  { accent: '#14B8A6', tint: '#CCFBF1' }, // teal
-  { accent: '#84CC16', tint: '#ECFCCB' }, // lime
-]
+const FLUR_COLOR: RoomColor = { accent: '#64748B', tint: '#E2E8F0' }
+const FALLBACK_COLOR: RoomColor = { accent: '#64748B', tint: '#F1F5F9' }
 
-const KNOWN: Record<string, RoomColor> = {
-  'atelier-blau': { accent: '#2563EB', tint: '#DBEAFE' },
-  'atelier-rot': { accent: '#DC2626', tint: '#FEE2E2' },
-  'atelier-gruen': { accent: '#16A34A', tint: '#DCFCE7' },
-  bibliothek: { accent: '#D97706', tint: '#FEF3C7' },
-  foyer: { accent: '#7C3AED', tint: '#EDE9FE' },
-  garten: { accent: '#0D9488', tint: '#CCFBF1' },
-}
-
+// The "own classroom" pseudo-room has no emoji of its own and keeps its fixed
+// color, so no board shifts hue underneath a class mid-year.
 export const HOME_COLOR: RoomColor = { accent: '#EA580C', tint: '#FFEDD5' }
 
 /** CSS vars for the "own classroom" pseudo-room. */
 export const homeVars = { '--accent': HOME_COLOR.accent, '--tint': HOME_COLOR.tint } as CSSProperties
-const FLUR_COLOR: RoomColor = { accent: '#64748B', tint: '#E2E8F0' }
 
 export function roomVars(room: Room): CSSProperties {
   const c = roomColor(room)
@@ -37,9 +29,6 @@ export function roomVars(room: Room): CSSProperties {
 }
 
 export function roomColor(room: Room): RoomColor {
-  if (KNOWN[room.id]) return KNOWN[room.id]
   if (room.scope !== 'all') return FLUR_COLOR
-  let hash = 0
-  for (const ch of room.id) hash = (hash * 31 + ch.charCodeAt(0)) % 997
-  return PALETTE[hash % PALETTE.length]
+  return (room.emoji && EMOJI_COLORS[hexname(room.emoji)]) || FALLBACK_COLOR
 }
