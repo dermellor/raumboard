@@ -5,7 +5,7 @@
 // account without the PIN may not flip it, and garbage is refused).
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 
@@ -108,4 +108,17 @@ test('garbage values are refused and change nothing', async () => {
     400,
   )
   assert.equal(await symbolsOf(), 'openmoji')
+})
+
+// The library itself must be served: on 2026-09-11 the boards on the demo
+// host showed broken images, because the static whitelist knew /assets/* and
+// the favicon but not the new /emoji/ directory, so its files fell through to
+// the SPA. Skipped without a build, since dist/ is the build output.
+test('serves the bundled OpenMoji library', async (t) => {
+  if (!existsSync(path.join('dist', 'emoji', '1F431.svg'))) return t.skip('no build output to serve')
+  const res = await app.request('/emoji/1F431.svg', {
+    headers: { host: `${TENANT}.raumboard.de` },
+  })
+  assert.equal(res.status, 200)
+  assert.match(res.headers.get('content-type') ?? '', /svg/)
 })

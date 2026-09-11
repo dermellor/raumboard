@@ -555,8 +555,14 @@ const LANDING = `<!doctype html><html lang="de"><head><meta charset="utf-8"><tit
 (<code>schulname.${BASE_DOMAIN}</code>).</p>
 </body></html>`
 
-app.use('/assets/*', serveStatic({ root: path.relative(process.cwd(), DIST) }))
-app.use('/favicon.svg', serveStatic({ root: path.relative(process.cwd(), DIST) }))
+// Everything the build produced is served as a file: assets, the OpenMoji
+// SVGs, the favicon. Directory requests fall through to the tenant logic
+// below, which is what the index option's nonexistent name is for: the bare
+// host must resolve tenants (landing page or board), so no index.html here.
+app.use(
+  '*',
+  serveStatic({ root: path.relative(process.cwd(), DIST), index: '_.no-directory-index' }),
+)
 
 app.get('*', (c) => {
   const slug = slugFromHost(c.req.header('host'))
