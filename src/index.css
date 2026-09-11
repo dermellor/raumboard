@@ -1035,6 +1035,29 @@ h1 {
   margin: 0 0.4rem 0.4rem 0;
 }
 
+/* the symbol squares in the tables match the fields' height exactly, so
+   their edges line up with name, select and icon buttons (2.6rem each); the
+   symbol itself fills the box at 2rem. The boards' picker keeps its own
+   size. Padding off and inline-flex center the symbol inside the box. */
+.admin .emoji-btn {
+  min-width: 2.6rem;
+  min-height: 2.6rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+}
+
+/* a cell mixes box heights (3rem symbol square, 2.6rem fields, icon
+   buttons); one shared middle axis keeps their edges flush */
+.admin td .emoji-btn,
+.admin td button,
+.admin td input,
+.admin td select {
+  vertical-align: middle;
+}
+
 .admin td button,
 .admin td input {
   margin-block: 0.15rem;
