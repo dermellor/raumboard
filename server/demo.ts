@@ -102,6 +102,9 @@ function seed(db: Database.Database): void {
   board.createUser(db, LOGIN.toLowerCase(), credentialHashes().admin, 'owner')
   board.setConfig(db, 'pin_hash', credentialHashes().pin)
   board.setConfig(db, 'pin_length', String(PIN.length))
+  // back to the showcase default: the visitor may have switched the symbol
+  // style in the Verwaltung, and an absent row is the OpenMoji default
+  db.prepare("DELETE FROM config WHERE key = 'symbols'").run()
 }
 
 export function openDemoBoard(id: string): Database.Database {

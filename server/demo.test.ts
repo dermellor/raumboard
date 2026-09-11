@@ -83,6 +83,8 @@ test('reset restores the seed and the published credentials', () => {
   board.setUserPassword(db, board.listUsers(db)[0].id, 'scrypt:1:1:1:x:y')
   board.createUser(db, 'extra@raumboard.de', 'scrypt:1:1:1:a:b', 'admin')
   board.setConfig(db, 'school_name', 'Umbenannt')
+  // … and the symbol style a visitor may have flipped in the Verwaltung
+  board.setConfig(db, 'symbols', 'native')
 
   resetDemoBoard(id)
 
@@ -98,6 +100,8 @@ test('reset restores the seed and the published credentials', () => {
   assert.ok(verifySecret('geheim-demo', board.getPassHash(db, accounts[0].id)!))
   assert.ok(verifySecret('4321', board.getConfig(db, 'pin_hash')!))
   assert.equal(board.getConfig(db, 'pin_length'), '4')
+  // back to the OpenMoji default, not the visitor's choice
+  assert.equal(board.getConfig(db, 'symbols'), undefined)
 })
 
 test('boards survive until the idle limit, then the sweeper drops them', () => {
