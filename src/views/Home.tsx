@@ -4,6 +4,7 @@ import { Seats } from '../components'
 import { DayEndReset } from '../DayEndReset'
 import { PasswordGate } from '../PasswordGate'
 import { roomVars } from '../roomColor'
+import { Symbol } from '../Symbol'
 import { logout, occupancy } from '../store'
 import { useBoard, useMeta } from '../useBoard'
 
@@ -16,7 +17,9 @@ export function Home() {
   return (
     <main>
       <div className="topbar">
-        <h1>🏫 {meta.mode === 'api' && meta.schoolName ? meta.schoolName : 'Raumboard'}</h1>
+        <h1>
+          <Symbol value="🏫" /> {meta.mode === 'api' && meta.schoolName ? meta.schoolName : 'Raumboard'}
+        </h1>
       </div>
 
       <h2>Klassen</h2>
@@ -27,7 +30,7 @@ export function Home() {
           return (
             <a key={c.id} href={`#/klasse/${c.id}`}>
               <div className="tile">
-                <span className="emoji">{c.emoji || kids[0]?.symbol || '🚪'}</span>
+                <Symbol className="emoji" value={c.emoji || kids[0]?.symbol || '🚪'} />
                 <span className="name">Klasse {c.name}</span>
                 <span className="count">
                   {away > 0 ? `${away} von ${kids.length} unterwegs` : `${kids.length} Kinder`}
@@ -43,7 +46,7 @@ export function Home() {
         {state.rooms.map((r) => (
           <a key={r.id} href={`#/raum/${r.id}`}>
             <div className="tile room-tile" style={roomVars(r)}>
-              <span className="emoji">{r.emoji}</span>
+              <Symbol className="emoji" value={r.emoji} />
               <span className="name">{r.name}</span>
               {r.isOpen ? (
                 <Seats capacity={r.capacity} occupied={occupancy(r.id, state)} />
@@ -59,7 +62,7 @@ export function Home() {
       <div className="grown-ups">
         {/* nothing to put back when every kid is in their classroom */}
         {anyAway && <DayEndReset />}
-        <a href="#/admin">
+        <a href="#/verwaltung/raeume">
           <Settings className="icon-soft" /> Verwaltung
         </a>
         {/* the school's account: needed for the import and for the credentials,

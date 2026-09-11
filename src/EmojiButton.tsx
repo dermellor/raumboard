@@ -1,6 +1,7 @@
 import { Plus, Search, X } from 'lucide-react'
 import { useState } from 'react'
 import { EMOJI_CATEGORIES, searchEmojis } from './emojis'
+import { Symbol } from './Symbol'
 
 /**
  * Emoji field with a built-in touch picker: tap the emoji, tap a new one.
@@ -30,7 +31,7 @@ export function EmojiButton({
   return (
     <>
       <button className="emoji-btn" aria-label={label} title={label} onClick={() => setOpen(true)}>
-        {value || <Plus />}
+        {value ? <Symbol value={value} /> : <Plus />}
       </button>
       {open && (
         <div className="overlay" onClick={() => setOpen(false)}>
@@ -58,7 +59,7 @@ export function EmojiButton({
                   <div className="emoji-grid">
                     {results.map((e) => (
                       <button key={e} aria-pressed={e === value} onClick={() => pick(e)}>
-                        {e}
+                        <Symbol value={e} />
                       </button>
                     ))}
                   </div>
@@ -72,7 +73,7 @@ export function EmojiButton({
                   <div className="emoji-grid">
                     {cat.emojis.map((e) => (
                       <button key={e} aria-pressed={e === value} onClick={() => pick(e)}>
-                        {e}
+                        <Symbol value={e} />
                       </button>
                     ))}
                   </div>

@@ -84,6 +84,10 @@ function connect() {
         state = msg.state
         if (!meta.ready) meta = { ...meta, ready: true }
         notify()
+      } else if (msg.type === 'symbols') {
+        // the symbols setting is school-wide; it reaches every board without reload
+        meta = { ...meta, symbols: msg.symbols }
+        notify()
       }
     } catch {
       // ignore malformed frames
@@ -231,6 +235,16 @@ export const apiStore: BoardStore = {
     if (res.ok) return { ok: true }
     const data = await res.json().catch(() => ({}))
     return { ok: false, reason: data.error ?? 'Ändern fehlgeschlagen' }
+  },
+
+  async setSymbols(mode): Promise<AuthResult> {
+    const res = await post('/api/symbols', { symbols: mode })
+    if (res.ok) {
+      setMeta({ symbols: mode })
+      return { ok: true }
+    }
+    const data = await res.json().catch(() => ({}))
+    return { ok: false, reason: data.error ?? 'Speichern fehlgeschlagen' }
   },
 
   async lockDevice() {

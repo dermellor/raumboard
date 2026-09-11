@@ -228,6 +228,11 @@ export const demoStore: BoardStore = {
   async changePin() {
     return { ok: false as const, reason: 'Im Demo-Modus nicht verfügbar' }
   },
+
+  async setSymbols() {
+    // the settings section is api-mode only; nothing to change in the demo
+    return { ok: false as const, reason: 'Im Demo-Modus nicht verfügbar' }
+  },
   async lockDevice() {},
 
   // no accounts in the offline demo store — the „Konten" tab is api-mode only

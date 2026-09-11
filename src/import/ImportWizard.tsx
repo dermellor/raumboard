@@ -1,6 +1,7 @@
 import { Eraser, FileUp, Upload, UserPlus } from 'lucide-react'
 import { useMemo, useRef, useState } from 'react'
 import { Modal } from '../components'
+import { Symbol } from '../Symbol'
 import { importKids } from '../store'
 import { useBoard } from '../useBoard'
 import { detectHeaderRow, FIELD_LABELS, guessMapping, parseFile, prepareKids, sliceTable } from './parse'
@@ -238,7 +239,9 @@ export function ImportWizard({ onClose }: { onClose: () => void }) {
               <tbody>
                 {prepared.slice(0, PREVIEW_LIMIT).map((p) => (
                   <tr key={p.rowIndex} className={p.issues.length ? 'bad' : undefined}>
-                    <td className="pv-emoji">{p.symbol}</td>
+                    <td className="pv-emoji">
+                      <Symbol value={p.symbol} />
+                    </td>
                     <td>{p.name || <em>{p.issues.join(', ')}</em>}</td>
                     <td className="pv-klass">{p.klassName ?? effectiveTarget ?? '?'}</td>
                   </tr>

@@ -5,8 +5,9 @@ import { login, verifyPassword } from './store'
 import { useMeta } from './useBoard'
 
 /**
- * Proof of the school's account, for both places that need it: the sign-in on
- * the start page, and the confirmation in front of „Import" and „Zugangsdaten".
+ * Proof of the school's account, for the three places that need it: the sign-in
+ * on the start page, the confirmation in front of the Zugänge page, and the
+ * one in front of the import button.
  *
  * With an admin session it asks for the password alone and only verifies it;
  * without one it asks for the email as well and signs in, because a session

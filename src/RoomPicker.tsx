@@ -1,5 +1,6 @@
 import { Seats } from './components'
 import { homeVars, roomVars } from './roomColor'
+import { Symbol } from './Symbol'
 import { book, canBook, occupancy, unbook } from './store'
 import { useBoard } from './useBoard'
 import type { Kid } from './types'
@@ -37,7 +38,7 @@ export function RoomPicker({ kid, onClose }: { kid: Kid; onClose: () => void }) 
               onClose()
             }}
           >
-            <span className="emoji">🏠</span>
+            <Symbol className="emoji" value="🏠" />
             <span className="name">Eigenes Klassenzimmer</span>
           </button>
           {state.rooms
@@ -56,7 +57,7 @@ export function RoomPicker({ kid, onClose }: { kid: Kid; onClose: () => void }) 
                     if (result.ok) onClose()
                   }}
                 >
-                  <span className="emoji">{room.emoji}</span>
+                  <Symbol className="emoji" value={room.emoji} />
                   <span className="name">{room.name}</span>
                   {here ? (
                     <span className="reason">Du bist schon hier</span>

@@ -27,6 +27,11 @@ export type StoreMeta = {
   demoCredentials?: { email: string; password: string; pin: string } | null
   /** digit count of the teacher PIN (api mode), for the segmented gate display */
   pinLength?: number | null
+  /**
+   * How symbols are drawn on the boards: self-hosted OpenMoji SVGs (default)
+   * or the device's own emoji (a school may prefer them; set in the Verwaltung).
+   */
+  symbols?: 'openmoji' | 'native'
 }
 
 export type AuthResult = { ok: true } | { ok: false; reason: string }
@@ -86,6 +91,8 @@ export type BoardStore = {
   /** re-verify with the current password (api mode; demo has nothing to change) */
   changePassword(current: string, next: string): Promise<AuthResult>
   changePin(password: string, pin: string): Promise<AuthResult>
+  /** how the boards draw symbols — school-wide, broadcast to every device */
+  setSymbols(mode: 'openmoji' | 'native'): Promise<AuthResult>
 
   /** account management (owner only, api mode) */
   listAccounts(): Promise<Account[]>

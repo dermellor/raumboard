@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { TopBar } from '../components'
 import { PinGate } from '../PinGate'
 import { homeVars, roomVars } from '../roomColor'
+import { Symbol } from '../Symbol'
 import { RoomPicker } from '../RoomPicker'
 import { useBoard, useMeta } from '../useBoard'
 
@@ -24,7 +25,13 @@ export function KlassenBoard({ klassId }: { klassId: string }) {
 
   return (
     <main>
-      <TopBar title={`${klass.emoji ? `${klass.emoji} ` : ''}Klasse ${klass.name}`} />
+      <TopBar
+        title={
+          <>
+            {klass.emoji && <Symbol value={klass.emoji} />} Klasse {klass.name}
+          </>
+        }
+      />
 
       <div className="tiles">
         {kids.map((kid) => {
@@ -39,15 +46,15 @@ export function KlassenBoard({ klassId }: { klassId: string }) {
                 setSelectedKidId(kid.id === selectedKidId ? null : kid.id)
               }}
             >
-              <span className="emoji">{kid.symbol}</span>
+              <Symbol className="emoji" value={kid.symbol} />
               <span className="name">{kid.name}</span>
               {room ? (
                 <span className="where" style={roomVars(room)}>
-                  {room.emoji} {room.name}
+                  <Symbol value={room.emoji} /> {room.name}
                 </span>
               ) : (
                 <span className="where" style={homeVars}>
-                  🏠 Klasse
+                  <Symbol value="🏠" /> Klasse
                 </span>
               )}
             </button>
@@ -64,7 +71,7 @@ export function KlassenBoard({ klassId }: { klassId: string }) {
           .filter((r) => kids.some((k) => k.currentRoomId === r.id))
           .map((r) => (
             <div key={r.id} className="tile room-tile" style={roomVars(r)}>
-              <span className="emoji">{r.emoji}</span>
+              <Symbol className="emoji" value={r.emoji} />
               <span className="name">{r.name}</span>
               <span>
                 {kids

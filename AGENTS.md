@@ -94,17 +94,46 @@ Consequences worth knowing before touching this:
 - **The Verwaltung asks for the PIN on every entry**, and an admin session does
   not skip it. The boards run on a whiteboard the children operate themselves and
   both cookies outlive a school day by design, so nothing persisted may leave
-  `#/admin` one tap away for a class. The gate is component state in
-  [`src/views/Admin.tsx`](src/views/Admin.tsx), not a cookie: switching tabs
-  inside the page keeps it open, leaving or reloading the page locks it again.
-- **„Kinder importieren", „Zugangsdaten" and „Konten" ask for the school's
-  password before they open**, by the same means and for the same reason: the
-  import brings personal data in from outside, the other two hold the keys to the
-  school, and a 30-day session cookie may not be what opens any of them.
-  `PASSWORD_TABS` in [`src/views/Admin.tsx`](src/views/Admin.tsx) names them, the
-  prompt is [`src/PasswordGate.tsx`](src/PasswordGate.tsx), and one confirmation
-  covers all three until the page is left. „Konten" is visible in api mode but
-  shows the roster only to an owner; a signed-in admin sees a short note there.
+  `#/verwaltung` one tap away for a class. The gate is component state in
+  [`src/views/verwaltung/VerwaltungShell.tsx`](src/views/verwaltung/VerwaltungShell.tsx),
+  not a cookie: switching pages inside the namespace keeps it open, leaving or
+  reloading it locks it again.
+- **The Verwaltung is a namespace of pages, not one tabbed page**: one route per
+  page (`#/verwaltung/<page>`, deep-linkable, browser back works), a one-row
+  navigation whose two halves are told apart by a separator and lock icons —
+  they differ in nothing but the access level, so they carry no names of their
+  own. The old `#/admin` address redirects to `#/verwaltung/raeume`. A third
+  group, more than seven pages, or a group label that earns its place would
+  flip the navigation to two rows; nothing of that exists yet.
+- **Klassen & Kinder is one page** (`#/verwaltung/kinder`): one table per
+  class under its bandarole, which carries the class (symbol, name, pencil
+  for the editing modal, kid count) and is collapsed by default, so the page
+  reads as a class list and opens into a roster on demand. The table under
+  it has its own column titles and the „Kind hinzufügen" button; clicks on
+  the bandarole's controls do not expand or collapse it. The class edit modal
+  holds symbol, name, and the deletion, which names the number of kids it
+  takes with it. The old `#/verwaltung/klassen` and
+  `#/verwaltung/klassenlisten` addresses redirect here.
+- **The import is a button at the foot of Klassen & Kinder**, because it
+  replaces exactly what that page shows. It asks for the school's password on
+  every click ([`PasswordGate`](src/PasswordGate.tsx), then the wizard): the
+  import brings personal data in from outside and can replace the data of the
+  whole school in one go, and a 30-day session cookie may not be what does
+  that.
+- **The Zugänge page asks for the school's password before it opens, on every
+  entry**: it holds the keys to the school (Zugangsdaten, Konten), and the same
+  cookie consideration applies.
+  `PASSWORD_PAGES` in [`src/views/verwaltung/VerwaltungShell.tsx`](src/views/verwaltung/VerwaltungShell.tsx)
+  names the password pages, and the confirmation holds for its own page until
+  another one is opened — returning to it asks again. „Konten" (inside
+  Zugänge) shows the roster only to an owner; a signed-in admin sees a short
+  note there.
+- **How the boards draw symbols is a per-school config**: the Tafeln page
+  (`#/verwaltung/tafeln`) offers OpenMoji (self-hosted SVGs, the default) or the
+  device's own emoji, on the PIN level like rooms, classes and kids (`config`
+  key `symbols`, `POST /api/symbols`, PIN-or-account on the API). The change is
+  broadcast over the WebSocket, so every whiteboard switches without a reload;
+  symbols without a downloaded asset always fall back to the system emoji.
 - **The confirmed password is handed to the credential forms**, so „Passwort
   ändern" asks for the new password only and „Lehrkraft-PIN ändern" for the new
   PIN. The server still requires the current password in the body; the gate has
@@ -114,7 +143,7 @@ Consequences worth knowing before touching this:
   „Verwaltung" ([`src/views/Home.tsx`](src/views/Home.tsx)). The same
   `PasswordGate` serves both jobs: with a session it verifies the password, and
   without one it asks for the email too and signs in, since a session that does
-  not exist yet cannot be confirmed. Opening a protected tab while signed out
+  not exist yet cannot be confirmed. Opening a protected page while signed out
   therefore signs in and opens it in one step.
 - **The gate's PIN entry sets `rb_board` too**, since it posts to the same
   endpoint as the board gate. Opening the Verwaltung on a fresh whiteboard
@@ -149,7 +178,8 @@ Consequences worth knowing before touching this:
   `0002_users.sql`), so nothing has to be re-provisioned.
 - **`POST /api/logout` ends the admin session only, `POST /api/lock` drops both
   cookies.** „Abmelden" on the start page must not lock the whiteboard a class
-  books on. „Dieses Gerät sperren" in the Zugangsdaten tab is the `lock` call.
+  books on. „Dieses Gerät sperren" on the Zugänge page (section „Dieses
+  Gerät") is the `lock` call.
 - **A new PIN cannot invalidate `rb_board`**, because the token is signed and
   carries an expiry with no reference to the PIN hash. That is deliberate, since
   the alternative locks every whiteboard in the school mid-year. Revoking one
@@ -220,7 +250,9 @@ success. Only `tsc -b`, inside `npm run build`, walks the three project referenc
 - `src/seed.ts` — 8 classes (1A–4B) with themed emoji sets, ~27 dummy kids each,
   14 rooms.
 - `src/views/` — `Home` (`#/`), `KlassenBoard` (`#/klasse/:id`), `RaumSicht`
-  (`#/raum/:id`), `Admin` (`#/admin`).
+  (`#/raum/:id`), and the Verwaltung namespace `#/verwaltung/:page` (shell in
+  `src/views/verwaltung/VerwaltungShell.tsx`, one file per page next to it,
+  shared edit helpers in `editing.tsx`).
 - `src/RoomPicker.tsx` — shared "Wohin gehst du?" overlay (class board + room view).
 - `src/EmojiButton.tsx` + `src/emojis.ts` — offline emoji picker with German
   keyword search.

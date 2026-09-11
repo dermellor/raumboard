@@ -42,6 +42,7 @@ export const {
   verifyPassword,
   changePassword,
   changePin,
+  setSymbols,
   lockDevice,
   listAccounts,
   createAccount,

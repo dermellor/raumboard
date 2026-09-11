@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Seats, TopBar } from '../components'
 import { PinGate } from '../PinGate'
 import { roomVars } from '../roomColor'
+import { Symbol } from '../Symbol'
 import { RoomPicker } from '../RoomPicker'
 import { occupancy } from '../store'
 import { useBoard, useMeta } from '../useBoard'
@@ -28,7 +29,7 @@ export function RaumSicht({ roomId }: { roomId: string }) {
     <main>
       <TopBar title="" />
       <div className="room-head" style={roomVars(room)}>
-        <span className="emoji">{room.emoji}</span>
+        <Symbol className="emoji" value={room.emoji} />
         <h1>{room.name}</h1>
         <Seats capacity={room.capacity} occupied={occ} />
         {!room.isOpen && <span className="badge-closed">heute geschlossen</span>}
@@ -55,7 +56,7 @@ export function RaumSicht({ roomId }: { roomId: string }) {
                         setSelectedKidId(k.id === selectedKidId ? null : k.id)
                       }}
                     >
-                      <span className="emoji">{k.symbol}</span>
+                      <Symbol className="emoji" value={k.symbol} />
                       <span className="name">{k.name}</span>
                     </button>
                   ))}

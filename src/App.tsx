@@ -1,11 +1,20 @@
 import { Lock, Sprout } from 'lucide-react'
+import { useEffect } from 'react'
 import { useRoute } from './router'
 import { lockDevice, reseed } from './store'
 import { useMeta } from './useBoard'
-import { Admin } from './views/Admin'
 import { Home } from './views/Home'
 import { KlassenBoard } from './views/KlassenBoard'
 import { RaumSicht } from './views/RaumSicht'
+import { Verwaltung } from './views/verwaltung/VerwaltungShell'
+
+/** Old addresses (`#/admin`, `#/verwaltung/klassen`, …) land on their successor. */
+function HashRedirect({ to }: { to: string }) {
+  useEffect(() => {
+    window.location.replace(to)
+  }, [to])
+  return null
+}
 
 export function App() {
   const route = useRoute()
@@ -26,8 +35,11 @@ export function App() {
     case 'raum':
       view = <RaumSicht roomId={route.id} />
       break
-    case 'admin':
-      view = <Admin />
+    case 'verwaltung':
+      view = <Verwaltung page={route.page} />
+      break
+    case 'verwaltung-alias':
+      view = <HashRedirect to={`#/verwaltung/${route.to}`} />
       break
     default:
       view = <Home />

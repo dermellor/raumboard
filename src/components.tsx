@@ -37,7 +37,7 @@ export function Modal({
   )
 }
 
-export function TopBar({ title, children }: { title: string; children?: ReactNode }) {
+export function TopBar({ title, children }: { title: ReactNode; children?: ReactNode }) {
   return (
     <div className="topbar">
       <a href="#/">

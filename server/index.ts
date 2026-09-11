@@ -168,6 +168,8 @@ api.get('/state', (c) => {
       // digit count of the teacher PIN, so the gate can show the right number of
       // slots. Only the length (not the PIN) — harmless for an anti-mischief PIN.
       pinLength: Number(board.getConfig(db, 'pin_length')) || null,
+      // how symbols are drawn; absent config means the OpenMoji default
+      symbols: board.getConfig(db, 'symbols') === 'native' ? 'native' : 'openmoji',
     },
   })
 })
@@ -219,7 +221,7 @@ api.post('/pin', async (c) => {
  * match a POST to `/rooms` itself.
  */
 const BOARD_PATHS = [
-  '/book', '/unbook', '/reset',
+  '/book', '/unbook', '/reset', '/symbols',
   '/rooms', '/rooms/*', '/kids', '/kids/*', '/klasses', '/klasses/*',
 ]
 for (const p of BOARD_PATHS) api.use(p, boardGuard)
@@ -290,6 +292,22 @@ api.post('/reseed', (c) => {
   else if (DEV) board.replaceAll(openBoard(boardId), buildSeed())
   else return c.json({ error: 'nicht erlaubt' }, 403)
   broadcast(boardId, stateMessage(boardId))
+  return c.json({ ok: true })
+})
+
+/**
+ * How the boards draw symbols: OpenMoji (default, self-hosted) or the device's
+ * own emoji. A school-wide display choice, so it sits on the teacher PIN like
+ * the rest of the Verwaltung, and the change is broadcast so every whiteboard
+ * switches without a reload.
+ */
+api.post('/symbols', async (c) => {
+  const boardId = c.get('boardId')
+  const { symbols } = await c.req.json<{ symbols?: string }>()
+  if (symbols !== 'openmoji' && symbols !== 'native')
+    return c.json({ error: 'symbols muss "openmoji" oder "native" sein' }, 400)
+  board.setConfig(openBoard(boardId), 'symbols', symbols)
+  broadcast(boardId, { type: 'symbols', symbols })
   return c.json({ ok: true })
 })
 
