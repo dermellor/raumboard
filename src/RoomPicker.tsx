@@ -1,4 +1,5 @@
 import { Seats } from './components'
+import { firstName } from './displayName'
 import { homeVars, roomVars } from './roomColor'
 import { Symbol } from './Symbol'
 import { book, canBook, occupancy, unbook } from './store'
@@ -6,15 +7,10 @@ import { useBoard } from './useBoard'
 import type { Kid } from './types'
 
 /**
- * The stored name carries the last-name initial ("Edgar E.") so two Edgars stay
- * distinguishable in the lists. The kid has already tapped their own tile here,
- * so the greeting drops it and just says the first name.
- */
-const firstName = (name: string) => name.split(' ')[0]
-
-/**
  * "Wohin gehst du?" overlay — used from the class board and the room view,
- * so kids can be (re)booked from either screen.
+ * so kids can be (re)booked from either screen. The kid has already tapped
+ * their own tile here, so the greeting drops the initial and just says the
+ * first name.
  */
 export function RoomPicker({ kid, onClose }: { kid: Kid; onClose: () => void }) {
   const state = useBoard()

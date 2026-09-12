@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { TopBar } from '../components'
+import { displayName } from '../displayName'
 import { PinGate } from '../PinGate'
 import { homeVars, roomVars } from '../roomColor'
 import { Symbol } from '../Symbol'
@@ -47,7 +48,7 @@ export function KlassenBoard({ klassId }: { klassId: string }) {
               }}
             >
               <Symbol className="emoji" value={kid.symbol} />
-              <span className="name">{kid.name}</span>
+              <span className="name">{displayName(kid.name, state.kids)}</span>
               {room ? (
                 <span className="where" style={roomVars(room)}>
                   <Symbol value={room.emoji} /> {room.name}
@@ -76,7 +77,7 @@ export function KlassenBoard({ klassId }: { klassId: string }) {
               <span>
                 {kids
                   .filter((k) => k.currentRoomId === r.id)
-                  .map((k) => `${k.symbol} ${k.name}`)
+                  .map((k) => `${k.symbol} ${displayName(k.name, state.kids)}`)
                   .join(', ')}
               </span>
             </div>

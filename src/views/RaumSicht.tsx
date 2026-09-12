@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Seats, TopBar } from '../components'
+import { displayName } from '../displayName'
 import { PinGate } from '../PinGate'
 import { roomVars } from '../roomColor'
 import { Symbol } from '../Symbol'
@@ -57,7 +58,7 @@ export function RaumSicht({ roomId }: { roomId: string }) {
                       }}
                     >
                       <Symbol className="emoji" value={k.symbol} />
-                      <span className="name">{k.name}</span>
+                      <span className="name">{displayName(k.name, state.kids)}</span>
                     </button>
                   ))}
               </div>
