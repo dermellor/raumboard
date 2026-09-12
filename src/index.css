@@ -124,12 +124,48 @@ button {
   line-height: 1.1;
 }
 
+/* Tiles give every symbol a fixed-size area, as tall as the largest capped
+   factor (1.4em), and center the artwork inside. A symbol's factor must not
+   move the name, so kid names and room names stay flush across a row; the
+   fixed height is what makes the transform safe here, not the margins. */
+.tile .emoji {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 1.4em;
+}
+
+.tile .sym img {
+  margin-block: 0;
+  margin-inline: 0;
+}
+
 /* OpenMoji SVGs scale with the font-size around them, so the existing
-   font-size rules keep sizing the symbols exactly as they sized the text. */
+   font-size rules keep sizing the symbols exactly as they sized the text.
+   --sym-scale is the manifest's per-symbol ink-area factor (see Symbol.tsx
+   and scripts/fetch-openmoji.mjs): thin designs grow, dense ones barely
+   shrink. The transform alone would paint past the 1em box into the
+   neighbors, so the margins grow the layout box by the same amount on each
+   side — scaled symbols keep the same distance to names and text. */
 .sym img {
+  --s: var(--sym-scale, 1);
   width: 1em;
   height: 1em;
   vertical-align: -0.125em;
+  transform: scale(var(--s));
+  margin-block: calc((var(--s) - 1) / 2 * 1em);
+  margin-inline: calc((var(--s) - 1) / 2 * 1em);
+}
+
+/* fixed-size boxes — the Verwaltung's symbol squares line up exactly with
+   name fields and buttons (2.6rem each), and the picker's grid buttons share
+   one height. There the margins are dropped; the capped factor keeps the
+   painted area inside the box (the widest ink reaches at most 1.3 × the
+   2rem box, which is the 2.6rem square exactly). */
+.admin .emoji-btn .sym img,
+.emoji-grid .sym img {
+  margin-block: 0;
+  margin-inline: 0;
 }
 
 .tile .name {
