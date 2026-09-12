@@ -13,7 +13,7 @@ const OPENMOJI = new Set(OPENMOJI_HEX)
  * Verwaltung, everything renders as text as before. `force` overrides the
  * school's setting, for previews of both options side by side.
  * `className` carries the sizing the way it always did: the SVG scales with the
- * font-size of its surroundings. `--sym-scale` carries the ink-area factor
+ * font-size of its surroundings. `--sym-scale` carries the painted-area factor
  * from the manifest (see scripts/fetch-openmoji.mjs), so thin or flat designs
  * (a car, a stack of books) reach the same optical presence as dense ones
  * (a fox, a sun). The stylesheet applies it: a transform grows the artwork

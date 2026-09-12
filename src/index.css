@@ -142,7 +142,7 @@ button {
 
 /* OpenMoji SVGs scale with the font-size around them, so the existing
    font-size rules keep sizing the symbols exactly as they sized the text.
-   --sym-scale is the manifest's per-symbol ink-area factor (see Symbol.tsx
+   --sym-scale is the manifest's per-symbol painted-area factor (see Symbol.tsx
    and scripts/fetch-openmoji.mjs): thin designs grow, dense ones barely
    shrink. The transform alone would paint past the 1em box into the
    neighbors, so the margins grow the layout box by the same amount on each

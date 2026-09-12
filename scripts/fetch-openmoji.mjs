@@ -103,22 +103,26 @@ const colorPair = (svg) => {
 
 // --- optical normalization --------------------------------------------------
 // OpenMoji designs fill their 72×72 canvas very differently (the fox paints
-// ~63% of its area, the car ~34%), so at one CSS size some symbols look
-// half the size of others. Each SVG's ink bounding box (the smallest box
-// around non-transparent pixels) is measured, and a per-symbol scale factor
-// equalizes the ink *area*: flat, wide artwork stays wide but grows to a
-// comparable optical presence. The anchor is an ink area of 72% of the
-// canvas (the area of a square filling 85% of each side); the factor is
-// clamped so near-full-bleed designs barely shrink and thin ones cannot
-// overflow their box. src/Symbol.tsx applies the factor as a transform.
+// 48% of it, the dragon 26% — its bounding box is huge, but the space between
+// the spread wings is empty), so at one CSS size some symbols look half the
+// size of others. A bounding-box area would credit that hollow space to the
+// dragon, so the *painted pixels* are counted instead and a per-symbol scale
+// factor equalizes the painted area: flat or airy artwork grows to a
+// comparable optical presence. The anchor is the fox's paint share — the
+// densest common design, which lands at exactly 1. Two caps bound the
+// factor: a global maximum (dense layouts must not balloon), and a per-symbol
+// reach cap from the ink's largest extent, which keeps the widest artwork
+// inside the contexts with fixed boxes (see src/index.css).
+// src/Symbol.tsx applies the factor as a transform.
 
-const SCALE_ANCHOR = 0.85 // ink area = (anchor × canvas)²
+const SCALE_TARGET_PAINTED = 0.482 // painted share of the canvas; the fox's
 const SCALE_MIN = 0.9
 const SCALE_MAX = 1.4
+const SCALE_REACH = 1.3 // ink extent the fixed boxes still hold (× the 1em box)
 
 const { Resvg } = await import('@resvg/resvg-js')
 
-/** Scale factor equalizing a rasterized SVG's ink area, or 1 if it fails. */
+/** Scale factor equalizing a rasterized SVG's painted area, or 1 if it fails. */
 const inkScale = (svg) => {
   let width, height, pixels
   try {
@@ -129,10 +133,11 @@ const inkScale = (svg) => {
   } catch {
     return 1
   }
-  let minX = width, minY = height, maxX = -1, maxY = -1
+  let minX = width, minY = height, maxX = -1, maxY = -1, painted = 0
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       if (pixels[(y * width + x) * 4 + 3] > 8) {
+        painted += 1
         if (x < minX) minX = x
         if (x > maxX) maxX = x
         if (y < minY) minY = y
@@ -141,10 +146,11 @@ const inkScale = (svg) => {
     }
   }
   if (maxX < 0) return 1 // fully transparent: nothing to normalize
-  const inkArea = (maxX - minX + 1) * (maxY - minY + 1)
-  const targetArea = (SCALE_ANCHOR * width * SCALE_ANCHOR * height)
-  const scale = Math.sqrt(targetArea / inkArea)
-  return Math.round(Math.min(SCALE_MAX, Math.max(SCALE_MIN, scale)) * 1000) / 1000
+  const maxDim = Math.max(maxX - minX + 1, maxY - minY + 1)
+  const targetArea = SCALE_TARGET_PAINTED * width * height
+  const reachCap = (SCALE_REACH * width) / maxDim
+  const scale = Math.sqrt(targetArea / painted)
+  return Math.round(Math.min(Math.min(SCALE_MAX, reachCap), Math.max(SCALE_MIN, scale)) * 1000) / 1000
 }
 // --- /optical normalization ------------------------------------------------
 
@@ -261,7 +267,7 @@ async function run() {
 // Hex names of the OpenMoji SVGs in public/emoji (CC BY-SA 4.0, openmoji.org),
 // plus the accent/tint color pair derived from each SVG's dominant fill
 // (consumed by src/roomColor.ts for the room tiles) and the scale factor
-// that equalizes each SVG's ink area (consumed by src/Symbol.tsx).
+// that equalizes each SVG's painted area (consumed by src/Symbol.tsx).
 export const OPENMOJI_HEX: string[] = [
 ${hexes.map((h) => `  '${h}',`).join('\n')}
 ]
