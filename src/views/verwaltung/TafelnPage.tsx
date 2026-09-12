@@ -25,7 +25,13 @@ export function TafelnPage() {
           <Symbol className="settings-preview" value="🐱" force="openmoji" />
           <span className="settings-option-text">
             <strong>Raumboard-Symbole</strong>
-            <span className="subline">Gezeichnete Icons, auf jedem Gerät gleich.</span>
+            <span className="subline">
+              Gezeichnete Icons, auf jedem Gerät gleich. Von{' '}
+              <a href="https://openmoji.org" target="_blank" rel="noreferrer">
+                OpenMoji
+              </a>{' '}
+              (CC BY-SA 4.0).
+            </span>
           </span>
         </label>
         <label className="settings-option">

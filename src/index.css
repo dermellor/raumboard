@@ -974,6 +974,13 @@ h1 {
   font-size: 0.9rem;
 }
 
+/* the OpenMoji credit sits in the subline: quiet like the text around it,
+   underlined so it still reads as a link */
+.settings-option-text .subline a {
+  color: inherit;
+  text-decoration: underline;
+}
+
 /* --- Klassen & Kinder: one table per class under a bandarole ---------------- */
 
 .admin details.klass {
