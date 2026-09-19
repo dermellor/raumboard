@@ -1,7 +1,7 @@
 import { KeyRound } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { Modal } from './components'
-import { enterPin } from './store'
+import type { AuthResult } from './storeTypes'
 import { useMeta } from './useBoard'
 
 /**
@@ -20,6 +20,9 @@ export function PinGate({
   title = 'Lehrkraft-PIN',
   intro = 'Dieses Gerät ist noch gesperrt. Eine Lehrkraft gibt einmalig die PIN ein, danach kann hier gebucht werden.',
   demoPin = 'prefill',
+  authenticate,
+  closable = true,
+  submitLabel = 'Bestätigen',
 }: {
   onClose: () => void
   onSuccess?: () => void
@@ -32,6 +35,9 @@ export function PinGate({
    * demonstrated, and a filled field would hide it behind one click.
    */
   demoPin?: 'prefill' | 'hint'
+  authenticate: (pin: string) => Promise<AuthResult>
+  closable?: boolean
+  submitLabel?: string
 }) {
   const meta = useMeta()
   const length = meta.pinLength ?? null
@@ -47,7 +53,7 @@ export function PinGate({
     if (busy) return
     setBusy(true)
     setError(null)
-    const result = await enterPin(value.trim())
+    const result = await authenticate(value.trim())
     setBusy(false)
     if (result.ok) onSuccess()
     else {
@@ -67,7 +73,7 @@ export function PinGate({
   const slots = length ? Array.from({ length }, (_, i) => i) : null
 
   return (
-    <Modal title={title} onClose={onClose}>
+    <Modal title={title} onClose={onClose} closable={closable}>
       <p>{intro}</p>
       {demoPin === 'hint' && demoValue && <p className="pin-hint">PIN dieser Demo: {demoValue}</p>}
 
@@ -122,7 +128,7 @@ export function PinGate({
 
       {error && <p className="form-error pin-error">{error}</p>}
       <button className="pin-submit" disabled={!pin.trim() || busy} onClick={() => void submit(pin)}>
-        <KeyRound /> Entsperren
+        <KeyRound /> {submitLabel}
       </button>
     </Modal>
   )

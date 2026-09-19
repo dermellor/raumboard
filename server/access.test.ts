@@ -39,7 +39,7 @@ test.after(() => rmSync(DATA, { recursive: true, force: true }))
 function call(
   method: string,
   path: string,
-  { body, cookies = {} }: { body?: object; cookies?: Record<string, string> } = {},
+  { body, cookies = {}, teacher }: { body?: object; cookies?: Record<string, string>; teacher?: string } = {},
 ) {
   const cookie = Object.entries(cookies)
     .map(([k, v]) => `${k}=${v}`)
@@ -50,6 +50,7 @@ function call(
       host: `${TENANT}.raumboard.de`,
       'Content-Type': 'application/json',
       ...(cookie ? { cookie } : {}),
+      ...(teacher ? { 'X-Raumboard-Teacher': teacher } : {}),
     },
     body: body === undefined ? (method === 'POST' ? '{}' : undefined) : JSON.stringify(body),
   })
@@ -68,24 +69,41 @@ async function pinCookie(): Promise<string> {
   return cookieFrom(res, 'rb_board')
 }
 
-async function adminCookie(): Promise<string> {
-  const res = await call('POST', '/login', { body: { email: EMAIL, password: PASSWORD } })
+async function teacherToken(rb_board: string): Promise<string> {
+  const res = await call('POST', '/teacher/verify', { cookies: { rb_board }, body: { pin: PIN } })
+  assert.equal(res.status, 200)
+  return ((await res.json()) as { token: string }).token
+}
+
+async function adminCookie(rb_board: string): Promise<string> {
+  const res = await call('POST', '/login', {
+    cookies: { rb_board },
+    body: { email: EMAIL, password: PASSWORD },
+  })
   assert.equal(res.status, 200)
   return cookieFrom(res, 'rb_admin')
+}
+
+async function teacherSession() {
+  const rb_board = await pinCookie()
+  return { rb_board, teacher: await teacherToken(rb_board) }
 }
 
 const someRoom = () => board.loadState(db).rooms[0]
 
 /** `/api/state`'s auth flags, which is all these tests read from it. */
-async function metaOf(res: Response): Promise<{ canOperate: boolean; isAdmin: boolean }> {
-  const body = (await res.json()) as { meta: { canOperate: boolean; isAdmin: boolean } }
-  return body.meta
+async function responseOf(res: Response) {
+  return (await res.json()) as {
+    state: unknown | null
+    meta: { deviceUnlocked: boolean; isAdmin: boolean }
+  }
 }
 
-test('without any cookie nothing can be changed', async () => {
-  const meta = await metaOf(await call('GET', '/state'))
-  assert.equal(meta.canOperate, false)
-  assert.equal(meta.isAdmin, false)
+test('a locked device receives no school data and cannot mutate or sign in', async () => {
+  const locked = await responseOf(await call('GET', '/state'))
+  assert.equal(locked.state, null)
+  assert.equal(locked.meta.deviceUnlocked, false)
+  assert.equal(locked.meta.isAdmin, false)
 
   for (const [method, p] of [
     ['POST', '/rooms'],
@@ -98,53 +116,69 @@ test('without any cookie nothing can be changed', async () => {
     ['POST', '/change-password'],
     ['POST', '/book'],
     ['POST', '/reset'],
+    ['POST', '/login'],
   ] as const) {
     const res = await call(method, p, { body: { name: 'X' } })
     assert.equal(res.status, 401, `${method} ${p} should be locked`)
   }
 })
 
-test('the teacher PIN opens the whole Verwaltung', async () => {
-  const rb_board = await pinCookie()
+test('the device PIN reveals state and a separate confirmation opens the Verwaltung', async () => {
+  const { rb_board, teacher } = await teacherSession()
   const cookies = { rb_board }
 
-  const meta = await metaOf(await call('GET', '/state', { cookies }))
-  assert.equal(meta.canOperate, true)
-  assert.equal(meta.isAdmin, false)
+  const unlocked = await responseOf(await call('GET', '/state', { cookies }))
+  assert.notEqual(unlocked.state, null)
+  assert.equal(unlocked.meta.deviceUnlocked, true)
+  assert.equal(unlocked.meta.isAdmin, false)
+
+  const withoutConfirmation = await call('POST', '/rooms', {
+    cookies,
+    body: { name: 'Gesperrt', emoji: '📚', capacity: 3, scope: 'all' },
+  })
+  assert.equal(withoutConfirmation.status, 403)
 
   const created = await call('POST', '/rooms', {
     cookies,
+    teacher,
     body: { name: 'Leseecke', emoji: '📚', capacity: 3, scope: 'all' },
   })
   assert.equal(created.status, 200)
   const room = board.loadState(db).rooms.find((r) => r.name === 'Leseecke')!
   assert.ok(room)
 
-  const closed = await call('PATCH', `/rooms/${room.id}`, { cookies, body: { isOpen: false } })
+  const closed = await call('PATCH', `/rooms/${room.id}`, { cookies, teacher, body: { isOpen: false } })
   assert.equal(closed.status, 200)
   assert.equal(board.loadState(db).rooms.find((r) => r.id === room.id)!.isOpen, false)
 
-  const klass = await call('POST', '/klasses', { cookies, body: { name: '9Z' } })
+  const klass = await call('POST', '/klasses', { cookies, teacher, body: { name: '9Z' } })
   assert.equal(klass.status, 200)
   const klassId = board.loadState(db).klasses.find((k) => k.name === '9Z')!.id
 
-  const kid = await call('POST', '/kids', { cookies, body: { klassId, symbol: '⭐', name: 'Test T.' } })
+  const kid = await call('POST', '/kids', { cookies, teacher, body: { klassId, symbol: '⭐', name: 'Test T.' } })
   assert.equal(kid.status, 200)
 
-  assert.equal((await call('DELETE', `/rooms/${room.id}`, { cookies })).status, 200)
-  assert.equal((await call('DELETE', `/klasses/${klassId}`, { cookies })).status, 200)
+  assert.equal((await call('DELETE', `/rooms/${room.id}`, { cookies, teacher })).status, 200)
+  assert.equal((await call('DELETE', `/klasses/${klassId}`, { cookies, teacher })).status, 200)
 })
 
-test('the import is the one thing the PIN does not open', async () => {
-  const rb_board = await pinCookie()
+test('the import needs device, Verwaltung confirmation and account together', async () => {
+  const { rb_board, teacher } = await teacherSession()
   const kids = [{ name: 'Import I.', symbol: '🐝', klass: '1A' }]
 
-  const refused = await call('POST', '/admin/import', { cookies: { rb_board }, body: { kids } })
-  assert.equal(refused.status, 401)
+  assert.equal(
+    (await call('POST', '/admin/import', { cookies: { rb_board }, teacher, body: { kids } })).status,
+    401,
+  )
 
-  const rb_admin = await adminCookie()
+  const rb_admin = await adminCookie(rb_board)
+  assert.equal(
+    (await call('POST', '/admin/import', { cookies: { rb_board, rb_admin }, body: { kids } })).status,
+    403,
+  )
   const accepted = await call('POST', '/admin/import', {
     cookies: { rb_board, rb_admin },
+    teacher,
     body: { kids, mode: 'append', targetKlass: null },
   })
   assert.equal(accepted.status, 200)
@@ -152,39 +186,57 @@ test('the import is the one thing the PIN does not open', async () => {
 })
 
 test('verifying the password needs a signed-in account and changes nothing', async () => {
-  // the PIN alone does not reach it any more: it is tied to a specific account
+  const { rb_board, teacher } = await teacherSession()
   const pinOnly = await call('POST', '/verify-password', {
-    cookies: { rb_board: await pinCookie() },
+    cookies: { rb_board },
+    teacher,
     body: { password: PASSWORD },
   })
   assert.equal(pinOnly.status, 401)
 
-  const cookies = { rb_admin: await adminCookie() }
-  const wrong = await call('POST', '/verify-password', { cookies, body: { password: 'falsch' } })
+  const cookies = { rb_board, rb_admin: await adminCookie(rb_board) }
+  const wrong = await call('POST', '/verify-password', { cookies, teacher, body: { password: 'falsch' } })
   assert.equal(wrong.status, 401)
 
-  const ok = await call('POST', '/verify-password', { cookies, body: { password: PASSWORD } })
+  const ok = await call('POST', '/verify-password', { cookies, teacher, body: { password: PASSWORD } })
   assert.equal(ok.status, 200)
   // it is a question, not a change: no cookie set
   assert.equal(ok.headers.getSetCookie().length, 0)
 })
 
-test('the credential forms verify against the signed-in account', async () => {
-  const cookies = { rb_admin: await adminCookie() }
+test('changing the PIN immediately invalidates every existing device grant', async () => {
+  const { rb_board, teacher } = await teacherSession()
+  const cookies = { rb_board, rb_admin: await adminCookie(rb_board) }
 
-  const wrong = await call('POST', '/change-pin', { cookies, body: { password: 'falsch', pin: '9999' } })
+  const wrong = await call('POST', '/change-pin', { cookies, teacher, body: { password: 'falsch', pin: '9999' } })
   assert.equal(wrong.status, 401)
 
-  const ok = await call('POST', '/change-pin', { cookies, body: { password: PASSWORD, pin: '9999' } })
+  const ok = await call('POST', '/change-pin', { cookies, teacher, body: { password: PASSWORD, pin: '9999' } })
   assert.equal(ok.status, 200)
-  assert.equal(board.getConfig(db, 'pin_length'), '4')
-  // put it back, the helpers above use the original PIN
+  const after = await responseOf(await call('GET', '/state', { cookies }))
+  assert.equal(after.state, null)
+  assert.equal(after.meta.deviceUnlocked, false)
+  assert.equal((await call('POST', '/book', { cookies, body: {} })).status, 401)
+  assert.equal((await call('POST', '/pin', { body: { pin: PIN } })).status, 401)
+  assert.equal((await call('POST', '/pin', { body: { pin: '9999' } })).status, 200)
+
+  // Restore the fixture and advance the epoch once more so no token from this
+  // test can become valid again in a later test.
   board.setConfig(db, 'pin_hash', hashSecret(PIN))
+  board.setConfig(db, 'unlock_epoch', String(Number(board.getConfig(db, 'unlock_epoch')) + 1))
+})
+
+test('the Feierabend reset requires the PIN for every execution', async () => {
+  const rb_board = await pinCookie()
+  const cookies = { rb_board }
+  assert.equal((await call('POST', '/reset', { cookies })).status, 401)
+  assert.equal((await call('POST', '/reset', { cookies, body: { pin: '0000' } })).status, 401)
+  assert.equal((await call('POST', '/reset', { cookies, body: { pin: PIN } })).status, 200)
 })
 
 test('signing out of the account leaves the device unlocked', async () => {
   const rb_board = await pinCookie()
-  const rb_admin = await adminCookie()
+  const rb_admin = await adminCookie(rb_board)
 
   const out = await call('POST', '/logout', { cookies: { rb_board, rb_admin } })
   assert.equal(cookieFrom(out, 'rb_admin'), '')
@@ -200,7 +252,7 @@ test('signing out of the account leaves the device unlocked', async () => {
 })
 
 test('a room may serve several classes', async () => {
-  const rb_board = await pinCookie()
+  const { rb_board, teacher } = await teacherSession()
   const cookies = { rb_board }
   const klassId = (name: string) => board.loadState(db).klasses.find((k) => k.name === name)!.id
   const kidOf = (klassId: string) =>
@@ -208,6 +260,7 @@ test('a room may serve several classes', async () => {
 
   const created = await call('POST', '/rooms', {
     cookies,
+    teacher,
     body: { name: 'Cluster-Ecke', emoji: '🧩', capacity: 4, scope: [klassId('1A'), klassId('1B')] },
   })
   assert.equal(created.status, 200)
@@ -223,26 +276,26 @@ test('a room may serve several classes', async () => {
   assert.equal(refused.status, 409)
 
   // the old single-string shape (a pre-list client) still works
-  const patched = await call('PATCH', `/rooms/${room.id}`, { cookies, body: { scope: klassId('1A') } })
+  const patched = await call('PATCH', `/rooms/${room.id}`, { cookies, teacher, body: { scope: klassId('1A') } })
   assert.equal(patched.status, 200)
   assert.deepEqual(board.loadState(db).rooms.find((r) => r.id === room.id)!.scope, [klassId('1A')])
 })
 
 test('deleting a class trims the scope lists and drops emptied rooms', async () => {
-  const rb_board = await pinCookie()
+  const { rb_board, teacher } = await teacherSession()
   const cookies = { rb_board }
 
   for (const name of ['5A', '5B'])
-    assert.equal((await call('POST', '/klasses', { cookies, body: { name } })).status, 200)
+    assert.equal((await call('POST', '/klasses', { cookies, teacher, body: { name } })).status, 200)
   const id5A = board.loadState(db).klasses.find((k) => k.name === '5A')!.id
   const id5B = board.loadState(db).klasses.find((k) => k.name === '5B')!.id
 
   for (const [name, scope] of [['Nur 5A', [id5A]], ['Beide', [id5A, id5B]]] as const) {
-    const res = await call('POST', '/rooms', { cookies, body: { name, emoji: '🧩', capacity: 3, scope } })
+    const res = await call('POST', '/rooms', { cookies, teacher, body: { name, emoji: '🧩', capacity: 3, scope } })
     assert.equal(res.status, 200)
   }
 
-  assert.equal((await call('DELETE', `/klasses/${id5A}`, { cookies })).status, 200)
+  assert.equal((await call('DELETE', `/klasses/${id5A}`, { cookies, teacher })).status, 200)
   const after = board.loadState(db)
   assert.ok(!after.rooms.some((r) => r.name === 'Nur 5A'), 'room scoped to only 5A goes with the class')
   assert.deepEqual(after.rooms.find((r) => r.name === 'Beide')!.scope, [id5B], '5B is kept')
@@ -250,16 +303,19 @@ test('deleting a class trims the scope lists and drops emptied rooms', async () 
 
 // last: the throttle blocks this board for 15 minutes once it trips
 test('password guessing on the credential endpoints is throttled', async () => {
-  const cookies = { rb_admin: await adminCookie() }
+  const { rb_board, teacher } = await teacherSession()
+  const cookies = { rb_board, rb_admin: await adminCookie(rb_board) }
   for (let i = 0; i < 5; i++) {
     const res = await call('POST', '/change-password', {
       cookies,
+      teacher,
       body: { current: `versuch-${i}`, next: 'ein-neues-passwort' },
     })
     assert.equal(res.status, 401)
   }
   const blocked = await call('POST', '/change-password', {
     cookies,
+    teacher,
     body: { current: PASSWORD, next: 'ein-neues-passwort' },
   })
   assert.equal(blocked.status, 429)

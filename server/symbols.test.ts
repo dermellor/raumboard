@@ -39,7 +39,7 @@ test.after(() => rmSync(DATA, { recursive: true, force: true }))
 function call(
   method: string,
   path: string,
-  { body, cookies = {} }: { body?: object; cookies?: Record<string, string> } = {},
+  { body, cookies = {}, teacher }: { body?: object; cookies?: Record<string, string>; teacher?: string } = {},
 ) {
   const cookie = Object.entries(cookies)
     .map(([k, v]) => `${k}=${v}`)
@@ -50,6 +50,7 @@ function call(
       host: `${TENANT}.raumboard.de`,
       'Content-Type': 'application/json',
       ...(cookie ? { cookie } : {}),
+      ...(teacher ? { 'X-Raumboard-Teacher': teacher } : {}),
     },
     body: body === undefined ? (method === 'POST' ? '{}' : undefined) : JSON.stringify(body),
   })
@@ -67,47 +68,54 @@ async function pinCookie(): Promise<string> {
   return cookieFrom(res, 'rb_board')
 }
 
-async function symbolsOf(): Promise<'openmoji' | 'native'> {
-  const body = (await (await call('GET', '/state')).json()) as {
+async function teacherToken(rb_board: string): Promise<string> {
+  const res = await call('POST', '/teacher/verify', { cookies: { rb_board }, body: { pin: PIN } })
+  assert.equal(res.status, 200)
+  return ((await res.json()) as { token: string }).token
+}
+
+async function symbolsOf(rb_board: string): Promise<'openmoji' | 'native'> {
+  const body = (await (await call('GET', '/state', { cookies: { rb_board } })).json()) as {
     meta: { symbols: 'openmoji' | 'native' }
   }
   return body.meta.symbols
 }
 
 test('default is OpenMoji', async () => {
-  assert.equal(await symbolsOf(), 'openmoji')
+  assert.equal(await symbolsOf(await pinCookie()), 'openmoji')
 })
 
-test('changing symbols is board level: PIN or account, then visible in /state', async () => {
-  // the account cookie alone is enough on the API (same level as rooms/kids
-  // CRUD: canOperate is isAdmin || hasBoard; the screen still asks for the PIN)
-  const adminLogin = await call('POST', '/login', { body: { email: EMAIL, password: PASSWORD } })
+test('changing symbols needs an unlocked device and a Verwaltung confirmation', async () => {
+  const pin = await pinCookie()
+  const teacher = await teacherToken(pin)
+  const adminLogin = await call('POST', '/login', {
+    cookies: { rb_board: pin },
+    body: { email: EMAIL, password: PASSWORD },
+  })
   assert.equal(adminLogin.status, 200)
   const admin = cookieFrom(adminLogin, 'rb_admin')
   assert.equal(
-    (await call('POST', '/symbols', { body: { symbols: 'native' }, cookies: { rb_admin: admin } })).status,
-    200,
+    (await call('POST', '/symbols', { body: { symbols: 'native' }, cookies: { rb_board: pin, rb_admin: admin } })).status,
+    403,
   )
-  assert.equal(await symbolsOf(), 'native')
 
-  // but no cookie at all changes nothing
   assert.equal((await call('POST', '/symbols', { body: { symbols: 'openmoji' } })).status, 401)
 
-  const pin = await pinCookie()
   assert.equal(
-    (await call('POST', '/symbols', { body: { symbols: 'openmoji' }, cookies: { rb_board: pin } })).status,
+    (await call('POST', '/symbols', { body: { symbols: 'native' }, cookies: { rb_board: pin }, teacher })).status,
     200,
   )
-  assert.equal(await symbolsOf(), 'openmoji')
+  assert.equal(await symbolsOf(pin), 'native')
 })
 
 test('garbage values are refused and change nothing', async () => {
   const pin = await pinCookie()
+  const teacher = await teacherToken(pin)
   assert.equal(
-    (await call('POST', '/symbols', { body: { symbols: 'twemoji' }, cookies: { rb_board: pin } })).status,
+    (await call('POST', '/symbols', { body: { symbols: 'twemoji' }, cookies: { rb_board: pin }, teacher })).status,
     400,
   )
-  assert.equal(await symbolsOf(), 'openmoji')
+  assert.equal(await symbolsOf(pin), 'native')
 })
 
 // The library itself must be served: on 2026-09-11 the boards on the demo

@@ -52,7 +52,7 @@ function CredentialsSection({ password }: { password: string }) {
     const result = await changePin(password, pin.trim())
     if (!result.ok) return setError(result.reason)
     close()
-    setNotice('Lehrkraft-PIN geändert. Bereits entsperrte Geräte bleiben entsperrt.')
+    setNotice('Lehrkraft-PIN geändert. Alle Geräte wurden gesperrt.')
   }
 
   return (

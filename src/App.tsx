@@ -1,7 +1,8 @@
 import { Lock, Sprout } from 'lucide-react'
 import { useEffect } from 'react'
+import { PinGate } from './PinGate'
 import { useRoute } from './router'
-import { lockDevice, reseed } from './store'
+import { lockDevice, reseed, unlockDevice } from './store'
 import { useMeta } from './useBoard'
 import { Home } from './views/Home'
 import { KlassenBoard } from './views/KlassenBoard'
@@ -24,6 +25,21 @@ export function App() {
     return (
       <main>
         <p>Lädt …</p>
+      </main>
+    )
+
+  if (meta.mode === 'api' && !meta.deviceUnlocked)
+    return (
+      <main className="device-lock">
+        <h1>{meta.schoolName ?? 'Raumboard'}</h1>
+        <PinGate
+          title="Gerät entsperren"
+          intro="Eine Lehrkraft entsperrt dieses Gerät mit der Lehrkraft-PIN."
+          authenticate={unlockDevice}
+          closable={false}
+          submitLabel="Entsperren"
+          onClose={() => {}}
+        />
       </main>
     )
 
@@ -60,7 +76,7 @@ export function App() {
         </button>
       )}
       {/* local dev only: clear the session so the PIN gate can be tested */}
-      {meta.dev && meta.canOperate && (
+      {meta.dev && meta.deviceUnlocked && (
         <button
           className="dev-lock"
           title="Nur lokal: Admin-Session und Geräte-PIN zurücksetzen, um die PIN-Eingabe zu testen"

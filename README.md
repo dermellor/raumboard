@@ -47,14 +47,13 @@ npm run lint       # oxlint
 
 ## Accounts and access
 
-Kids never log in. A school has a teacher PIN that does nearly all the work, and
-one or more admin accounts for the few things that need one:
+Kids never log in. Access has three independent levels:
 
-| | Teacher PIN | Admin account |
+| Level | What it opens | Lifetime |
 | --- | --- | --- |
-| What it is for | booking on a device, and the Verwaltung: rooms, classes, kids | the Excel/CSV import, the account's own password, and (owners) managing the accounts |
-| Entered by | a teacher, once per device and on every entry to the Verwaltung | an account holder (email + password) |
-| Then valid for | 180 days on that device | 30 days in that browser |
+| Device unlock | school data, booking and returning | `rb_board`, 180 days |
+| Verwaltung confirmation | rooms, classes, kids and board display settings | this Verwaltung visit; held in tab memory |
+| Admin account | import, own credentials, and for owners the account roster | `rb_admin`, 30 days |
 
 A school starts with one owner account and the owner adds the rest under
 „Konten" on the Verwaltung's Zugänge page. There are two roles: an
@@ -62,10 +61,11 @@ A school starts with one owner account and the owner adds the rest under
 password. Accounts are deactivated rather than deleted, and new or reset
 passwords are shown once.
 
-A whiteboard or iPad is unlocked once with the PIN and stays usable for the rest
-of the school year, so children tap their symbol without entering anything. The
-Verwaltung asks for the PIN every time it is opened; rooms, classes & kids and
-the symbol choice need nothing else. Every page has its own address
+A new or explicitly locked whiteboard or iPad shows only the PIN gate. The
+server sends no classes, children, rooms or occupancy until the PIN unlocks the
+device. It then stays usable for 180 days, so children tap their symbol without
+entering anything. The Verwaltung asks for the same PIN every time it is opened;
+that confirmation disappears on leaving or reloading it. Every page has its own address
 (`#/verwaltung/raeume` and so on), and the old `#/admin` still works.
 
 Signing in and out of an account happens at the foot of the start page, next to
@@ -86,9 +86,8 @@ Worth knowing:
   the whole school, and the children operate that whiteboard themselves.
 - After five wrong passwords that board waits 15 minutes.
 - „Abmelden" ends the account session and leaves the device unlocked for
-  booking. Changing the PIN does not lock devices that are already unlocked
-either. „Dieses Gerät sperren" on the Zugänge page does that, for the
-  device it is used on.
+  booking. Changing the teacher PIN immediately locks every device in the
+  school. „Dieses Gerät sperren" locks only the device it is used on.
 - How the boards draw symbols is a per-school choice on the „Tafeln" page:
   OpenMoji on every device (the default), or the device's own emoji.
 

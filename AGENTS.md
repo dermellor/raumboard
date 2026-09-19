@@ -52,16 +52,20 @@ First rollout is a pilot primary school in NRW.
 Who needs which secret is in [`README.md`](README.md); this is the mechanism.
 The teacher PIN is a scrypt hash in the tenant's `config` table; the admin
 accounts are rows in a `users` table (`email`, `pass_hash`, `role`, `active`),
-one per person. All hashes are scrypt ([`server/auth.ts`](server/auth.ts)), both
-cookies are HMAC-signed and stateless (no session store), and neither can stand
-in for the other.
+one per person. All hashes are scrypt ([`server/auth.ts`](server/auth.ts)). The
+three grants are independent:
 
-| | Teacher PIN | Admin account |
-| --- | --- | --- |
-| Secret | 4 to 8 digits (6 when generated), `pin_hash` in `config` | email + password per account, a row in `users` |
-| Endpoint | `POST /api/pin` | `POST /api/login` |
-| Cookie / TTL | `rb_board`, 180 days | `rb_admin`, 30 days, carrying the account id |
-| Unlocks | `/api/book`, `/api/unbook`, `/api/reset` and the Verwaltung CRUD: `/api/rooms`, `/api/kids`, `/api/klasses` | its own credentials (`/api/verify-password`, `/api/change-password`, `/api/change-pin`), the import (`/api/admin/*`), and for an owner the roster (`/api/accounts/*`) |
+| Grant | Created by | Storage / lifetime | Unlocks |
+| --- | --- | --- | --- |
+| Device | `POST /api/pin`, teacher PIN (4 to 8 digits) | `rb_board`, 180 days | protected state, WebSocket, booking and returning |
+| Verwaltung | `POST /api/teacher/verify`, teacher PIN | signed token held in tab memory | rooms, classes, kids, symbols; required alongside account grants |
+| Account | `POST /api/login`, email + password | `rb_admin`, 30 days, carrying the account id | import, own credentials, and for an owner the roster |
+
+A locked device receives `state: null` from `/api/state`, opens no WebSocket and
+renders only the global PIN gate. `rb_admin` never substitutes for `rb_board`.
+The Verwaltung token never persists: switching its pages keeps it, leaving or
+reloading the namespace drops it. The Feierabend reset is one atomic request
+with the PIN in its body and creates no further grant.
 
 **The dividing line is bulk.** The import is the one mutation that brings personal
 data in from outside and can replace the whole school's data in a single step
@@ -80,24 +84,22 @@ cookie is dead at the next request (the id is resolved against `users` each time
 unlike the PIN, which a new value cannot revoke). Deactivating replaces deleting,
 so the roster is reversible.
 
-The server derives `canOperate = isAdmin || hasBoard`, and `isAdmin` now means „a
-signed-in, still-active account" ([`server/index.ts`](server/index.ts)):
+The server checks each grant independently ([`server/index.ts`](server/index.ts)):
 
-| Cookies held | Book on a board | Verwaltung: rooms, classes, kids | Import, Zugangsdaten, Konten |
+| Grants held | Read and book | Verwaltung CRUD | Import and credentials |
 | --- | --- | --- | --- |
-| PIN only | yes | yes | the gate signs in first (email + password) |
-| account only | yes | API yes, but the screen asks for the PIN first | yes, after the password (Konten only for owners) |
-| both | yes | yes | yes, after the password (Konten only for owners) |
+| none | no state returned | no | no |
+| device | yes | no | no |
+| device + Verwaltung | yes | yes | no |
+| device + Verwaltung + account | yes | yes | yes; roster only for owners |
 
 Consequences worth knowing before touching this:
 
 - **The Verwaltung asks for the PIN on every entry**, and an admin session does
-  not skip it. The boards run on a whiteboard the children operate themselves and
-  both cookies outlive a school day by design, so nothing persisted may leave
-  `#/verwaltung` one tap away for a class. The gate is component state in
-  [`src/views/verwaltung/VerwaltungShell.tsx`](src/views/verwaltung/VerwaltungShell.tsx),
-  not a cookie: switching pages inside the namespace keeps it open, leaving or
-  reloading it locks it again.
+  not skip it. The resulting signed token lives only in [`src/apiStore.ts`](src/apiStore.ts)
+  memory and accompanies Verwaltung requests in `X-Raumboard-Teacher`.
+  Switching pages inside the namespace keeps it; leaving or reloading clears it.
+  The API enforces this layer, so a device cookie alone cannot mutate Verwaltung data.
 - **The Verwaltung is a namespace of pages, not one tabbed page**: one route per
   page (`#/verwaltung/<page>`, deep-linkable, browser back works), a one-row
   navigation whose two halves are told apart by a separator and lock icons —
@@ -131,7 +133,7 @@ Consequences worth knowing before touching this:
 - **How the boards draw symbols is a per-school config**: the Tafeln page
   (`#/verwaltung/tafeln`) offers OpenMoji (self-hosted SVGs, the default) or the
   device's own emoji, on the PIN level like rooms, classes and kids (`config`
-  key `symbols`, `POST /api/symbols`, PIN-or-account on the API). The change is
+  key `symbols`, `POST /api/symbols`, device plus Verwaltung grant). The change is
   broadcast over the WebSocket, so every whiteboard switches without a reload;
   symbols without a downloaded asset always fall back to the system emoji.
 - **The confirmed password is handed to the credential forms**, so „Passwort
@@ -145,9 +147,9 @@ Consequences worth knowing before touching this:
   without one it asks for the email too and signs in, since a session that does
   not exist yet cannot be confirmed. Opening a protected page while signed out
   therefore signs in and opens it in one step.
-- **The gate's PIN entry sets `rb_board` too**, since it posts to the same
-  endpoint as the board gate. Opening the Verwaltung on a fresh whiteboard
-  therefore unlocks that device for booking as well.
+- **The device must be unlocked before any application page opens.** The global
+  gate posts to `/api/pin`; the Verwaltung gate posts separately to
+  `/api/teacher/verify` and does not alter the device cookie.
 - **The Feierabend-Reset re-asks for the PIN as well**, for the same reason and
   by the same means ([`src/DayEndReset.tsx`](src/DayEndReset.tsx)). It wipes the
   occupancy of the whole school and sits on the start page, so on an unlocked
@@ -171,25 +173,24 @@ Consequences worth knowing before touching this:
   owner, and an owner cannot demote or deactivate their own account. New and reset
   passwords are generated and shown once; no plaintext is stored.
 - **The `rb_admin` token carries the account id** (`tenant.admin.<id>.<exp>`),
-  where the board token stays `tenant.board.<exp>`. Shipping this invalidated the
-  old admin cookies once (a format change), so admins signed in again; board/PIN
-  unlocks were untouched. A build before the `users` table adopts a school's
+  while the board token is `tenant.board.<epoch>.<exp>`. A build before the
+  `users` table adopts a school's
   single `config` login as the first `owner` on the next open (migration
   `0002_users.sql`), so nothing has to be re-provisioned.
 - **`POST /api/logout` ends the admin session only, `POST /api/lock` drops both
   cookies.** „Abmelden" on the start page must not lock the whiteboard a class
   books on. „Dieses Gerät sperren" on the Zugänge page (section „Dieses
-  Gerät") is the `lock` call.
-- **A new PIN cannot invalidate `rb_board`**, because the token is signed and
-  carries an expiry with no reference to the PIN hash. That is deliberate, since
-  the alternative locks every whiteboard in the school mid-year. Revoking one
-  device means `POST /api/lock` from it, so a „reset all devices" feature would
-  need a tenant-wide token epoch first.
+  Gerät") is the `lock` call and removes loaded school data immediately.
+- **Changing the teacher PIN locks every device immediately.** Device and
+  Verwaltung tokens carry the school's `unlock_epoch`; `/api/change-pin`
+  increments it, sends `locked` to all connected sockets and closes them. Old
+  tokens then fail every REST request and WebSocket upgrade. The device that made
+  the change is locked as well. `POST /api/lock` still locks only its caller.
 
 [`server/access.test.ts`](server/access.test.ts) drives the level matrix through
-the real app: no cookie changes nothing, the PIN opens the Verwaltung and is
-refused by the import, the credential endpoints need an account and share a
-throttle, and which cookie each sign-off clears.
+the real app: locked state contains no school data, device and Verwaltung grants
+are separate, reset rechecks the PIN, changing it invalidates existing devices,
+credential endpoints need all applicable grants, and password attempts share a throttle.
 [`server/accounts.test.ts`](server/accounts.test.ts) drives the roster: owner
 adds and lists, the password is returned once, a duplicate is refused, an admin
 is refused the roster but does the import, the last-owner and self guards hold,
@@ -320,7 +321,7 @@ start page next to „Verwaltung" rather than inside it: it changes today's
 occupancy, while the Verwaltung is about rooms, classes and kids. It only renders
 while at least one kid is out, because with everyone in their classroom there is
 nothing to put back. `POST /api/reset` matches that placement, needing only
-`canOperate`.
+an unlocked device and the PIN supplied for that reset request.
 
 ## Ports
 

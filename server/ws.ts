@@ -30,3 +30,15 @@ export function broadcast(boardId: string, message: object): void {
     if (ws.readyState === ws.OPEN) ws.send(data)
   }
 }
+
+/** Tell every open tab that its device grant is dead, then stop all data flow. */
+export function lockBoard(boardId: string): void {
+  const set = sockets.get(boardId)
+  if (!set) return
+  const data = JSON.stringify({ type: 'locked' })
+  for (const ws of [...set]) {
+    if (ws.readyState === ws.OPEN) ws.send(data)
+    ws.close()
+  }
+  sockets.delete(boardId)
+}

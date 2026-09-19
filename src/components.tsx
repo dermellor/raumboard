@@ -18,18 +18,22 @@ export function Modal({
   onClose,
   children,
   wide,
+  closable = true,
 }: {
   title: string
   onClose: () => void
   children: ReactNode
   wide?: boolean
+  closable?: boolean
 }) {
   return (
-    <div className="overlay" onClick={onClose}>
+    <div className="overlay" onClick={closable ? onClose : undefined}>
       <div className={`picker modal${wide ? ' modal-wide' : ''}`} onClick={(e) => e.stopPropagation()}>
-        <button className="close" onClick={onClose} aria-label="Schließen">
-          <X />
-        </button>
+        {closable && (
+          <button className="close" onClick={onClose} aria-label="Schließen">
+            <X />
+          </button>
+        )}
         <h2>{title}</h2>
         {children}
       </div>

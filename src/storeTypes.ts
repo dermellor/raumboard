@@ -5,8 +5,10 @@ export type StoreMeta = {
   /** false until the first state fetch (api mode); demo is always ready */
   ready: boolean
   schoolName?: string
-  /** teacher level: bookings and the Verwaltung (teacher PIN entered, or admin) */
-  canOperate: boolean
+  /** this browser has a current device grant and may receive school data */
+  deviceUnlocked: boolean
+  /** one Verwaltung visit has a current in-memory PIN confirmation */
+  teacherConfirmed: boolean
   /** account level: a signed-in account (import, own credentials, and for an
    * owner the account management) */
   isAdmin: boolean
@@ -83,8 +85,15 @@ export type BoardStore = {
   login(email: string, password: string): Promise<AuthResult>
   /** ends the admin session; the device stays unlocked for booking */
   logout(): Promise<void>
-  enterPin(pin: string): Promise<AuthResult>
-  /** clears admin + board unlock, so the PIN gate is asked for again */
+  /** initial device unlock; persists in the rb_board cookie */
+  unlockDevice(pin: string): Promise<AuthResult>
+  /** confirms the PIN for one Verwaltung visit; proof stays in tab memory */
+  confirmTeacherPin(pin: string): Promise<AuthResult>
+  /** drops the in-memory Verwaltung proof when its shell unmounts */
+  clearTeacherAccess(): void
+  /** confirms the PIN and performs exactly one Feierabend reset */
+  resetWithPin(pin: string): Promise<AuthResult>
+  /** clears account + device unlock and removes all loaded school data */
   lockDevice(): Promise<void>
   /** is this the school's password? changes nothing (gate in front of two tabs) */
   verifyPassword(password: string): Promise<AuthResult>

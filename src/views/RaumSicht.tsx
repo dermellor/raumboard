@@ -1,18 +1,15 @@
 import { useState } from 'react'
 import { Seats, TopBar } from '../components'
 import { displayName } from '../displayName'
-import { PinGate } from '../PinGate'
 import { roomVars } from '../roomColor'
 import { Symbol } from '../Symbol'
 import { RoomPicker } from '../RoomPicker'
 import { occupancy } from '../store'
-import { useBoard, useMeta } from '../useBoard'
+import { useBoard } from '../useBoard'
 
 export function RaumSicht({ roomId }: { roomId: string }) {
   const state = useBoard()
-  const meta = useMeta()
   const [selectedKidId, setSelectedKidId] = useState<string | null>(null)
-  const [showPin, setShowPin] = useState(false)
 
   const room = state.rooms.find((r) => r.id === roomId)
   if (!room)
@@ -53,7 +50,6 @@ export function RaumSicht({ roomId }: { roomId: string }) {
                       className="tile"
                       aria-pressed={k.id === selectedKidId}
                       onClick={() => {
-                        if (!meta.canOperate) return setShowPin(true)
                         setSelectedKidId(k.id === selectedKidId ? null : k.id)
                       }}
                     >
@@ -66,7 +62,6 @@ export function RaumSicht({ roomId }: { roomId: string }) {
           ))
       )}
 
-      {showPin && <PinGate onClose={() => setShowPin(false)} />}
       {selectedKid && <RoomPicker kid={selectedKid} onClose={() => setSelectedKidId(null)} />}
     </main>
   )

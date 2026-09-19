@@ -1,12 +1,13 @@
 import {
   KeyRound, LayoutGrid, Lock, Presentation, School, Settings, Sprout, Users,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { reseed } from '../../store'
 import type { VerwaltungPage } from '../../router'
 import { PasswordGate } from '../../PasswordGate'
 import { PinGate } from '../../PinGate'
 import { useMeta } from '../../useBoard'
+import { clearTeacherAccess, confirmTeacherPin } from '../../store'
 import { KinderPage } from './KinderPage'
 import { RaeumePage } from './RaeumePage'
 import { TafelnPage } from './TafelnPage'
@@ -40,11 +41,14 @@ const PASSWORD_PAGES: readonly VerwaltungPage[] = ['zugaenge']
  */
 export function Verwaltung({ page }: { page: VerwaltungPage }) {
   const meta = useMeta()
-  const [unlocked, setUnlocked] = useState(false)
   // the school's password once the gate confirmed it *for this page*, so the
   // credential forms can send it without asking a second time; leaving the
   // page drops the confirmation, and returning asks for it again
   const [confirmed, setConfirmed] = useState<{ page: VerwaltungPage; password: string } | null>(null)
+
+  // The Verwaltung proof belongs to this mounted namespace only. A route
+  // change inside it keeps the component; leaving or reloading loses it.
+  useEffect(() => () => clearTeacherAccess(), [])
 
   const confirmedHere = confirmed?.page === page ? confirmed.password : null
   const needsPassword =
@@ -56,7 +60,7 @@ export function Verwaltung({ page }: { page: VerwaltungPage }) {
   // *every* entry: the device unlock lasts months, a class does not. Component
   // state, not a cookie — leaving the namespace locks it again. The password
   // pages ask for the school's password on top of it, the same way.
-  const gateOpen = meta.mode === 'api' && !unlocked
+  const gateOpen = meta.mode === 'api' && !meta.teacherConfirmed
 
   return (
     <main className="admin">
@@ -73,7 +77,8 @@ export function Verwaltung({ page }: { page: VerwaltungPage }) {
         <PinGate
           intro="Die Verwaltung ist nur für Lehrkräfte. Bitte die PIN eingeben."
           demoPin="hint"
-          onSuccess={() => setUnlocked(true)}
+          authenticate={confirmTeacherPin}
+          onSuccess={() => {}}
           onClose={() => {
             window.location.hash = '#/'
           }}

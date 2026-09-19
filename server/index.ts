@@ -29,7 +29,7 @@ import {
   resetDemoBoard,
   startDemoSweeper,
 } from './demo'
-import { broadcast, register } from './ws'
+import { broadcast, lockBoard, register } from './ws'
 import { buildSeed } from '../src/seed'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
@@ -64,6 +64,7 @@ if (DEV && DEFAULT_TENANT && DEFAULT_TENANT !== DEMO_TENANT) {
 
 const ADMIN_TTL = 30 * 24 * 3600
 const BOARD_TTL = 180 * 24 * 3600
+const TEACHER_TTL = 12 * 3600
 
 /**
  * What a request acts on. For a school that is its tenant slug; for the demo it
@@ -92,18 +93,25 @@ app.get('/ask', (c) => {
 // --- helpers -----------------------------------------------------------------
 
 /**
- * `canOperate` is the teacher level: today's bookings *and* the Verwaltung
- * (rooms, classes, kids). `isAdmin` means a signed-in account, needed for the
- * import, the account's own credentials, and (owners) the account management.
+ * Device, Verwaltung and account access are independent. A signed-in account
+ * never unlocks a device. The short-lived teacher token is returned only after
+ * a PIN confirmation and held in one tab's memory by the frontend.
  * The admin cookie carries the account id; it is resolved against the database
  * on every request, so a deactivated account's still-signed cookie is dead at
  * once — unlike the PIN, which a new value cannot revoke.
  */
 function authInfo(c: any, boardId: string) {
+  const db = openBoard(boardId)
+  const epoch = unlockEpoch(db)
   const userId = verifyAdminToken(getCookie(c, 'rb_admin'), boardId)
-  const account = userId ? board.getActiveUser(openBoard(boardId), userId) : undefined
-  const hasBoard = verifyToken(getCookie(c, 'rb_board'), boardId, 'board')
-  return { isAdmin: !!account, canOperate: !!account || hasBoard, account }
+  const account = userId ? board.getActiveUser(db, userId) : undefined
+  const hasBoard = verifyToken(getCookie(c, 'rb_board'), boardId, 'board', epoch)
+  const hasTeacher = verifyToken(c.req.header('x-raumboard-teacher'), boardId, 'teacher', epoch)
+  return { isAdmin: !!account, hasBoard, hasTeacher, account }
+}
+
+function unlockEpoch(db: ReturnType<typeof openBoard>): number {
+  return Number(board.getConfig(db, 'unlock_epoch')) || 0
 }
 
 function openBoard(boardId: string) {
@@ -150,16 +158,18 @@ api.use('*', async (c, next) => {
 api.get('/state', (c) => {
   const boardId = c.get('boardId')
   const db = openBoard(boardId)
-  const { isAdmin, canOperate, account } = authInfo(c, boardId)
+  const { isAdmin, hasBoard, account } = authInfo(c, boardId)
   return c.json({
-    state: board.loadState(db),
+    // A locked device receives no school data. The remaining fields are only
+    // what the lock screen needs before the PIN can be entered.
+    state: hasBoard ? board.loadState(db) : null,
     meta: {
       mode: 'api',
       schoolName: board.getConfig(db, 'school_name') ?? boardId,
-      isAdmin,
-      canOperate,
+      isAdmin: hasBoard && isAdmin,
+      deviceUnlocked: hasBoard,
       // who is signed in, so the UI can greet them and show the owner-only tab
-      account: account ? { email: account.email, role: account.role } : null,
+      account: hasBoard && account ? { email: account.email, role: account.role } : null,
       dev: DEV,
       // throwaway demo board: nothing is stored, so the UI may offer a reset
       ephemeral: isDemoBoard(boardId),
@@ -168,11 +178,15 @@ api.get('/state', (c) => {
       // digit count of the teacher PIN, so the gate can show the right number of
       // slots. Only the length (not the PIN) — harmless for an anti-mischief PIN.
       pinLength: Number(board.getConfig(db, 'pin_length')) || null,
-      // how symbols are drawn; absent config means the OpenMoji default
-      symbols: board.getConfig(db, 'symbols') === 'native' ? 'native' : 'openmoji',
+      // Display config is part of the protected school state as well.
+      symbols: hasBoard
+        ? board.getConfig(db, 'symbols') === 'native' ? 'native' : 'openmoji'
+        : undefined,
     },
   })
 })
+
+api.use('/login', deviceGuard)
 
 api.post('/login', async (c) => {
   const boardId = c.get('boardId')
@@ -211,25 +225,42 @@ api.post('/pin', async (c) => {
   const storedHash = board.getConfig(db, 'pin_hash')
   if (!pin || !storedHash || !verifySecret(pin.trim(), storedHash))
     return c.json({ error: 'PIN falsch' }, 401)
-  setCookie(c, 'rb_board', makeToken(boardId, 'board', BOARD_TTL), { ...cookieOpts(), maxAge: BOARD_TTL })
+  setCookie(c, 'rb_board', makeToken(boardId, 'board', unlockEpoch(db), BOARD_TTL), {
+    ...cookieOpts(),
+    maxAge: BOARD_TTL,
+  })
   return c.json({ ok: true })
 })
 
-/**
- * Everything the teacher PIN unlocks: today's bookings and the Verwaltung.
- * Collection and item paths are listed separately because `/rooms/*` does not
- * match a POST to `/rooms` itself.
- */
-const BOARD_PATHS = [
-  '/book', '/unbook', '/reset', '/symbols',
-  '/rooms', '/rooms/*', '/kids', '/kids/*', '/klasses', '/klasses/*',
-]
-for (const p of BOARD_PATHS) api.use(p, boardGuard)
-
-async function boardGuard(c: any, next: () => Promise<void>) {
-  if (!authInfo(c, c.get('boardId')).canOperate) return c.json({ error: 'locked' }, 401)
+async function deviceGuard(c: any, next: () => Promise<void>) {
+  if (!authInfo(c, c.get('boardId')).hasBoard) return c.json({ error: 'locked' }, 401)
   await next()
 }
+
+for (const p of ['/book', '/unbook']) api.use(p, deviceGuard)
+
+/** One Verwaltung visit: the token stays in this tab's memory only. */
+api.post('/teacher/verify', deviceGuard, async (c) => {
+  const boardId = c.get('boardId')
+  const db = openBoard(boardId)
+  const { pin } = await c.req.json<{ pin?: string }>()
+  const storedHash = board.getConfig(db, 'pin_hash')
+  if (!pin || !storedHash || !verifySecret(pin.trim(), storedHash))
+    return c.json({ error: 'PIN falsch' }, 401)
+  return c.json({ token: makeToken(boardId, 'teacher', unlockEpoch(db), TEACHER_TTL) })
+})
+
+async function teacherGuard(c: any, next: () => Promise<void>) {
+  const auth = authInfo(c, c.get('boardId'))
+  if (!auth.hasBoard) return c.json({ error: 'locked' }, 401)
+  if (!auth.hasTeacher) return c.json({ error: 'teacher confirmation required' }, 403)
+  await next()
+}
+
+const TEACHER_PATHS = [
+  '/symbols', '/rooms', '/rooms/*', '/kids', '/kids/*', '/klasses', '/klasses/*',
+]
+for (const p of TEACHER_PATHS) api.use(p, teacherGuard)
 
 /**
  * The account's own credentials. These need to know *which* account, so they
@@ -237,7 +268,10 @@ async function boardGuard(c: any, next: () => Promise<void>) {
  * password is checked against that account. A PIN-only device is refused here.
  */
 async function adminGuard(c: any, next: () => Promise<void>) {
-  if (!authInfo(c, c.get('boardId')).isAdmin) return c.json({ error: 'admin required' }, 401)
+  const auth = authInfo(c, c.get('boardId'))
+  if (!auth.hasBoard) return c.json({ error: 'locked' }, 401)
+  if (!auth.hasTeacher) return c.json({ error: 'teacher confirmation required' }, 403)
+  if (!auth.isAdmin) return c.json({ error: 'admin required' }, 401)
   await next()
 }
 for (const p of ['/verify-password', '/change-password', '/change-pin']) api.use(p, adminGuard)
@@ -248,7 +282,10 @@ for (const p of ['/verify-password', '/change-password', '/change-pin']) api.use
  * and change its own password, but cannot touch the roster.
  */
 async function ownerGuard(c: any, next: () => Promise<void>) {
-  if (authInfo(c, c.get('boardId')).account?.role !== 'owner')
+  const auth = authInfo(c, c.get('boardId'))
+  if (!auth.hasBoard) return c.json({ error: 'locked' }, 401)
+  if (!auth.hasTeacher) return c.json({ error: 'teacher confirmation required' }, 403)
+  if (auth.account?.role !== 'owner')
     return c.json({ error: 'owner required' }, 403)
   await next()
 }
@@ -273,9 +310,14 @@ api.post('/unbook', async (c) => {
   return c.json({ ok: true })
 })
 
-api.post('/reset', (c) => {
+api.post('/reset', deviceGuard, async (c) => {
   const boardId = c.get('boardId')
-  board.reset(openBoard(boardId))
+  const db = openBoard(boardId)
+  const { pin } = await c.req.json<{ pin?: string }>()
+  const storedHash = board.getConfig(db, 'pin_hash')
+  if (!pin || !storedHash || !verifySecret(pin.trim(), storedHash))
+    return c.json({ error: 'PIN falsch' }, 401)
+  board.reset(db)
   broadcast(boardId, stateMessage(boardId))
   return c.json({ ok: true })
 })
@@ -286,7 +328,7 @@ api.post('/reset', (c) => {
  * allowed in local dev. On a school's board it is refused outright, so real
  * children's data can never be destroyed through the API.
  */
-api.post('/reseed', (c) => {
+api.post('/reseed', deviceGuard, (c) => {
   const boardId = c.get('boardId')
   if (isDemoBoard(boardId)) resetDemoBoard(boardId)
   else if (DEV) board.replaceAll(openBoard(boardId), buildSeed())
@@ -316,10 +358,7 @@ api.post('/symbols', async (c) => {
  * carries personal data in from outside and can replace the whole school's data
  * in a single step, so the `/admin/` prefix means exactly „needs the login".
  */
-api.use('/admin/*', async (c, next) => {
-  if (!authInfo(c, c.get('boardId')).isAdmin) return c.json({ error: 'admin required' }, 401)
-  await next()
-})
+api.use('/admin/*', adminGuard)
 
 api.post('/admin/import', async (c) => {
   const boardId = c.get('boardId')
@@ -480,7 +519,12 @@ api.post('/change-pin', async (c) => {
     return c.json({ error: 'PIN muss aus 4–8 Ziffern bestehen' }, 400)
   board.setConfig(db, 'pin_hash', hashSecret(pin.trim()))
   board.setConfig(db, 'pin_length', String(pin.trim().length))
+  board.setConfig(db, 'unlock_epoch', String(unlockEpoch(db) + 1))
   failures.delete(boardId)
+  // Every existing board and Verwaltung token carries the previous epoch.
+  // Connected clients are told immediately and the sockets are closed before
+  // another state broadcast can expose data to them.
+  lockBoard(boardId)
   return c.json({ ok: true })
 })
 
@@ -621,18 +665,24 @@ if (process.env.RAUMBOARD_NO_LISTEN !== '1') {
 }
 
 /**
- * Same resolution as `boardFor`, from raw upgrade headers (no Hono context here).
- * A demo socket without the session cookie is refused rather than pointed at a
- * new board: the page load sets that cookie, so the client only has to reconnect.
+ * Same resolution as `boardFor`, from raw upgrade headers (no Hono context
+ * here). WebSockets receive the full board state, so the current device token
+ * is mandatory at upgrade time.
  */
 function wsBoardId(host: string | undefined, cookieHeader: string | undefined): string | null {
   const slug = slugFromHost(host)
   if (!slug) return null
+  let boardId: string | null = null
   if (slug === DEMO_TENANT) {
     const session = cookieValue(cookieHeader, DEMO_COOKIE)
-    return isSession(session) ? demoBoardId(session) : null
+    boardId = isSession(session) ? demoBoardId(session) : null
+  } else if (tenantExists(slug)) {
+    boardId = slug
   }
-  return tenantExists(slug) ? slug : null
+  if (!boardId) return null
+  const db = openBoard(boardId)
+  const token = cookieValue(cookieHeader, 'rb_board')
+  return verifyToken(token, boardId, 'board', unlockEpoch(db)) ? boardId : null
 }
 
 function cookieValue(header: string | undefined, name: string): string | undefined {

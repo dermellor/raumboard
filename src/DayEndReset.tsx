@@ -1,7 +1,7 @@
 import { RotateCcw } from 'lucide-react'
 import { useState } from 'react'
 import { PinGate } from './PinGate'
-import { reset } from './store'
+import { reset, resetWithPin } from './store'
 import { useMeta } from './useBoard'
 
 /**
@@ -17,7 +17,7 @@ export function DayEndReset() {
   const meta = useMeta()
   const [gate, setGate] = useState(false)
 
-  // localStorage mode has no PIN at all (`enterPin` is a no-op there), so the
+  // localStorage mode has no PIN at all, so the
   // gate would unlock on any input — ask the plain question instead.
   const start = () => {
     if (meta.mode === 'api') return setGate(true)
@@ -33,9 +33,10 @@ export function DayEndReset() {
         <PinGate
           title="Alle zurück in die Klasse"
           intro="Alle Kinder werden in ihre Klassenzimmer zurückgebucht. Bitte die Lehrkraft-PIN eingeben."
+          authenticate={resetWithPin}
+          submitLabel="Alle zurückbuchen"
           onSuccess={() => {
             setGate(false)
-            reset()
           }}
           onClose={() => setGate(false)}
         />

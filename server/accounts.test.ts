@@ -40,7 +40,7 @@ test.after(() => rmSync(DATA, { recursive: true, force: true }))
 function call(
   method: string,
   p: string,
-  { body, cookies = {} }: { body?: object; cookies?: Record<string, string> } = {},
+  { body, cookies = {}, teacher }: { body?: object; cookies?: Record<string, string>; teacher?: string } = {},
 ) {
   const cookie = Object.entries(cookies)
     .map(([k, v]) => `${k}=${v}`)
@@ -51,6 +51,7 @@ function call(
       host: `${TENANT}.raumboard.de`,
       'Content-Type': 'application/json',
       ...(cookie ? { cookie } : {}),
+      ...(teacher ? { 'X-Raumboard-Teacher': teacher } : {}),
     },
     body: body === undefined ? (method === 'POST' ? '{}' : undefined) : JSON.stringify(body),
   })
@@ -62,23 +63,51 @@ function cookieFrom(res: Response, name: string): string {
   return header.slice(name.length + 1).split(';')[0]
 }
 
-async function ownerCookie(): Promise<string> {
-  const res = await call('POST', '/login', { body: { email: OWNER, password: OWNER_PW } })
+async function deviceCookie(): Promise<string> {
+  const res = await call('POST', '/pin', { body: { pin: PIN } })
   assert.equal(res.status, 200)
-  return cookieFrom(res, 'rb_admin')
+  return cookieFrom(res, 'rb_board')
 }
 
-/** Sign in a fresh account and return its board cookie, plus its id. */
-async function makeAdmin(email: string, role = 'admin'): Promise<{ id: string; cookie: string }> {
+async function teacherToken(rb_board: string): Promise<string> {
+  const res = await call('POST', '/teacher/verify', { cookies: { rb_board }, body: { pin: PIN } })
+  assert.equal(res.status, 200)
+  return ((await res.json()) as { token: string }).token
+}
+
+async function ownerAuth() {
+  const rb_board = await deviceCookie()
+  const res = await call('POST', '/login', {
+    cookies: { rb_board },
+    body: { email: OWNER, password: OWNER_PW },
+  })
+  assert.equal(res.status, 200)
+  return {
+    cookies: { rb_board, rb_admin: cookieFrom(res, 'rb_admin') },
+    teacher: await teacherToken(rb_board),
+  }
+}
+
+/** Create and sign in a fresh account with the complete device context. */
+async function makeAdmin(email: string, role = 'admin') {
+  const owner = await ownerAuth()
   const created = await call('POST', '/accounts', {
-    cookies: { rb_admin: await ownerCookie() },
+    ...owner,
     body: { email, role },
   })
   assert.equal(created.status, 200)
   const data = (await created.json()) as { account: { id: string }; password: string }
-  const login = await call('POST', '/login', { body: { email, password: data.password } })
+  const rb_board = owner.cookies.rb_board
+  const login = await call('POST', '/login', {
+    cookies: { rb_board },
+    body: { email, password: data.password },
+  })
   assert.equal(login.status, 200)
-  return { id: data.account.id, cookie: cookieFrom(login, 'rb_admin') }
+  return {
+    id: data.account.id,
+    cookies: { rb_board, rb_admin: cookieFrom(login, 'rb_admin') },
+    teacher: owner.teacher,
+  }
 }
 
 async function isAdminOf(cookies: Record<string, string>): Promise<boolean> {
@@ -87,9 +116,9 @@ async function isAdminOf(cookies: Record<string, string>): Promise<boolean> {
 }
 
 test('an owner adds an account and its password is returned once', async () => {
-  const cookies = { rb_admin: await ownerCookie() }
+  const auth = await ownerAuth()
   const res = await call('POST', '/accounts', {
-    cookies,
+    ...auth,
     body: { email: 'Lehrkraft@Example.ORG', role: 'admin' },
   })
   assert.equal(res.status, 200)
@@ -100,18 +129,20 @@ test('an owner adds an account and its password is returned once', async () => {
 
   // the new account can sign in with the shown password
   const login = await call('POST', '/login', {
+    cookies: { rb_board: auth.cookies.rb_board },
     body: { email: 'lehrkraft@example.org', password: data.password },
   })
   assert.equal(login.status, 200)
 
-  const list = await call('GET', '/accounts', { cookies })
+  const list = await call('GET', '/accounts', auth)
   const accounts = ((await list.json()) as { accounts: { email: string }[] }).accounts
   assert.ok(accounts.some((a) => a.email === 'lehrkraft@example.org'))
 })
 
 test('a duplicate email is refused', async () => {
+  const auth = await ownerAuth()
   const res = await call('POST', '/accounts', {
-    cookies: { rb_admin: await ownerCookie() },
+    ...auth,
     body: { email: OWNER, role: 'admin' },
   })
   assert.equal(res.status, 409)
@@ -119,62 +150,62 @@ test('a duplicate email is refused', async () => {
 
 test('an admin account cannot reach the roster, but can import', async () => {
   const admin = await makeAdmin('rosterless@example.org')
-  const cookies = { rb_admin: admin.cookie }
 
-  assert.equal((await call('GET', '/accounts', { cookies })).status, 403)
+  assert.equal((await call('GET', '/accounts', admin)).status, 403)
   assert.equal(
-    (await call('POST', '/accounts', { cookies, body: { email: 'y@example.org' } })).status,
+    (await call('POST', '/accounts', { ...admin, body: { email: 'y@example.org' } })).status,
     403,
   )
   // the account level still opens the import
   const imported = await call('POST', '/admin/import', {
-    cookies,
+    ...admin,
     body: { kids: [{ name: 'Neu N.', symbol: '🐝', klass: '1A' }], mode: 'append', targetKlass: null },
   })
   assert.equal(imported.status, 200)
 })
 
 test('the last active owner cannot be demoted or deactivated', async () => {
-  const cookies = { rb_admin: await ownerCookie() }
-  const list = ((await (await call('GET', '/accounts', { cookies })).json()) as {
+  const auth = await ownerAuth()
+  const list = ((await (await call('GET', '/accounts', auth)).json()) as {
     accounts: { id: string; role: string }[]
   }).accounts
   const owner = list.find((a) => a.role === 'owner')!
 
-  assert.equal((await call('PATCH', `/accounts/${owner.id}`, { cookies, body: { role: 'admin' } })).status, 409)
-  assert.equal((await call('PATCH', `/accounts/${owner.id}`, { cookies, body: { active: false } })).status, 409)
+  assert.equal((await call('PATCH', `/accounts/${owner.id}`, { ...auth, body: { role: 'admin' } })).status, 409)
+  assert.equal((await call('PATCH', `/accounts/${owner.id}`, { ...auth, body: { active: false } })).status, 409)
 })
 
 test('deactivating an account kills its cookie at once', async () => {
   const temp = await makeAdmin('temp@example.org')
-  assert.equal(await isAdminOf({ rb_admin: temp.cookie }), true)
+  assert.equal(await isAdminOf(temp.cookies), true)
 
+  const owner = await ownerAuth()
   const deact = await call('PATCH', `/accounts/${temp.id}`, {
-    cookies: { rb_admin: await ownerCookie() },
+    ...owner,
     body: { active: false },
   })
   assert.equal(deact.status, 200)
 
   // same still-signed cookie, now dead because the account is resolved per request
-  assert.equal(await isAdminOf({ rb_admin: temp.cookie }), false)
+  assert.equal(await isAdminOf(temp.cookies), false)
 })
 
 test('resetting a password issues a new one and revokes the old', async () => {
-  const ownerCk = { rb_admin: await ownerCookie() }
-  const created = await call('POST', '/accounts', { cookies: ownerCk, body: { email: 'reset@example.org' } })
+  const owner = await ownerAuth()
+  const created = await call('POST', '/accounts', { ...owner, body: { email: 'reset@example.org' } })
   const first = ((await created.json()) as { account: { id: string }; password: string })
 
-  const reset = await call('POST', `/accounts/${first.account.id}/reset-password`, { cookies: ownerCk })
+  const reset = await call('POST', `/accounts/${first.account.id}/reset-password`, owner)
   assert.equal(reset.status, 200)
   const second = ((await reset.json()) as { password: string }).password
   assert.notEqual(second, first.password)
 
   assert.equal(
-    (await call('POST', '/login', { body: { email: 'reset@example.org', password: first.password } })).status,
+    (await call('POST', '/login', { cookies: { rb_board: owner.cookies.rb_board }, body: { email: 'reset@example.org', password: first.password } })).status,
     401,
   )
   assert.equal(
-    (await call('POST', '/login', { body: { email: 'reset@example.org', password: second } })).status,
+    (await call('POST', '/login', { cookies: { rb_board: owner.cookies.rb_board }, body: { email: 'reset@example.org', password: second } })).status,
     200,
   )
 })

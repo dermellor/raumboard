@@ -51,19 +51,28 @@ export function generatePin(): string {
 
 // --- signed tokens --------------------------------------------------------
 
-export type TokenKind = 'admin' | 'board'
+export type TokenKind = 'board' | 'teacher'
 
 function sign(payload: string): string {
   return createHmac('sha256', SECRET).update(payload).digest('base64url')
 }
 
-export function makeToken(tenant: string, kind: TokenKind, ttlSeconds: number): string {
+/**
+ * Board and teacher tokens carry the school's current unlock epoch. Changing
+ * the teacher PIN increments that value and invalidates every token at once.
+ */
+export function makeToken(tenant: string, kind: TokenKind, epoch: number, ttlSeconds: number): string {
   const exp = Math.floor(Date.now() / 1000) + ttlSeconds
-  const payload = `${tenant}.${kind}.${exp}`
+  const payload = `${tenant}.${kind}.${epoch}.${exp}`
   return `${payload}.${sign(payload)}`
 }
 
-export function verifyToken(token: string | undefined, tenant: string, kind: TokenKind): boolean {
+export function verifyToken(
+  token: string | undefined,
+  tenant: string,
+  kind: TokenKind,
+  epoch: number,
+): boolean {
   if (!token) return false
   const idx = token.lastIndexOf('.')
   if (idx < 0) return false
@@ -72,8 +81,10 @@ export function verifyToken(token: string | undefined, tenant: string, kind: Tok
   const expected = sign(payload)
   if (sig.length !== expected.length || !timingSafeEqual(Buffer.from(sig), Buffer.from(expected)))
     return false
-  const [t, k, expStr] = payload.split('.')
-  return t === tenant && k === kind && Number(expStr) > Date.now() / 1000
+  const parts = payload.split('.')
+  if (parts.length !== 4) return false
+  const [t, k, epochStr, expStr] = parts
+  return t === tenant && k === kind && Number(epochStr) === epoch && Number(expStr) > Date.now() / 1000
 }
 
 // --- admin tokens (carry the account id) -----------------------------------
