@@ -81,3 +81,30 @@ CSV/JSON), die Löschung wird bestätigt.
 **Ansprechpartner für Datenschutzvorfälle:** «BETREIBER_NAME», «BETREIBER_KONTAKT».
 Meldung an die Schule unverzüglich, spätestens innerhalb von 24 Stunden nach
 Kenntnis.
+
+## 6. Nutzungsstatistik (OpenPanel)
+
+**Erhebung:** Die Nutzung der Anwendung wird ausschließlich **serverseitig**
+über eine selbst betriebene OpenPanel-Instanz («openpanel.example», EU/DE)
+gemessen. Es gibt kein Browser-SDK, keine Analyse-Cookies und keine
+IP-Speicherung im Frontend; die Boards laden keinen Tracking-Code.
+
+**Umfang der Daten:** Pro Event nur: Mandanten-Slug (Schul-Kennung), ein
+pseudonymes Board-Kennzeichen (Hash des Geräte-Tokens), Lernort-ID, Zeitstempel
+sowie Zähler für Erfolgs-/Fehlversuche. Keine Namen — auch nicht Vorname +
+Initial —, keine E-Mail-Adressen, keine IP-Adressen, keine Standorte. Es werden
+keine Personen, sondern Geräteaktionen gezählt; eine De-Pseudonymisierung
+einzelner Kinder ist aus den Daten nicht möglich.
+
+**Zweck:** Erkennung von Nutzung und Störungen (welche Lernorte werden gebucht,
+wie viele Boards sind aktiv, wo brechen Nutzende ab — z. B. wiederholt
+fehlgeschlagene PIN-Eingaben), Verbesserung des Produkts, Betriebsdokumentation.
+
+**Speicherdauer/Retention:** gemäß Einstellung des OpenPanel-Projekts
+(standardmäßig 12 Monate), danach automatische Löschung.
+
+**Widerspruch (Opt-out):** Jede Schule kann die Erhebung vollständig
+abschalten; der Betreiber setzt hierfür den Mandanten-Schalter
+`analytics_opt_out` in der Instanz-Konfiguration. Der Verzicht wird
+serverseitig erzwungen. Die Funktionsfähigkeit der Anwendung ist vom
+Widerspruch nicht berührt.

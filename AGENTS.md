@@ -470,6 +470,20 @@ show. Typing four digits is not what stands between a visitor and the product.
 reset, expiry and both startup refusals
 ([`server/demo.test.ts`](server/demo.test.ts)).
 
+## Usage statistics (OpenPanel, server-side)
+
+Usage is measured **server-side only**: the Node backend posts events to the
+maintainer's self-hosted OpenPanel instance (`analytics.12signals.com`, own
+„raumboard" project) via [`server/analytics.ts`](server/analytics.ts). No browser
+SDK, no tracking cookies, no IPs, and no names — not even first name + initial;
+the `profileId` is the tenant slug, boards are a hash of the device token.
+Events: `app_open`, `booking`, `return`, `pin_unlock_failed`, `admin_login`
+(details in [`docs/Analytics.md`](docs/Analytics.md)). Every send is
+fire-and-forget (errors logged, never thrown), demo boards are never tracked,
+and a school opts out via the `config` key `analytics_opt_out` — enforced in the
+backend, so `RAUMBOARD_OPENPANEL_KEY` unset means zero tracking. Covered by
+[`server/analytics.test.ts`](server/analytics.test.ts).
+
 ## Deploy
 
 The app self-hosts as a Node/Hono server (SQLite per tenant, WebSockets) behind a

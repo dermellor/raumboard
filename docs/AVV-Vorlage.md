@@ -77,6 +77,17 @@ Der Auftragnehmer trifft die in **Anlage 1 (TOM.md)** beschriebenen Maßnahmen. 
 sind Vertragsbestandteil und werden bei Bedarf an den Stand der Technik angepasst;
 das Schutzniveau darf dabei nicht unterschritten werden.
 
+### 5a. Nutzungsstatistik
+
+Der Auftragnehmer betreibt eine rein technische, **serverseitige**
+Nutzungsstatistik (OpenPanel, eigenes Projekt, Details in Anlage 1 Abschnitt 6
+„Nutzungsstatistik"): ausschließlich Geräteaktionen, Mandanten-Kennung und
+pseudonyme Board-Kennzeichen — keine Namen, keine E-Mail-Adressen, keine
+IP-Adressen. Der Verantwortliche kann die Erhebung für seine Schule jederzeit
+vollständig abschalten (Opt-out); die Verarbeitung erfolgt nur im Rahmen von
+Art. 28 Abs. 3 lit. a DSGVO (technische Bereitstellung und Verbesserung des
+Vertragsprodukts).
+
 ### 6. Unterauftragsverhältnisse
 
 (1) Der Verantwortliche stimmt dem Einsatz folgender Unterauftragsverarbeiter zu:
