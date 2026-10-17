@@ -20,7 +20,8 @@ process.env.RAUMBOARD_DEMO_TENANT = ''
 process.env.RAUMBOARD_NO_LISTEN = '1'
 process.env.RAUMBOARD_SECRET = 'test-secret-test-secret-test-secret'
 process.env.RAUMBOARD_OPENPANEL_URL = 'http://openpanel.test'
-process.env.RAUMBOARD_OPENPANEL_KEY = 'test-key'
+process.env.RAUMBOARD_OPENPANEL_CLIENT_ID = 'test-client-id'
+process.env.RAUMBOARD_OPENPANEL_ORIGIN = 'https://www.raumboard.de'
 
 const { openTenant } = await import('./tenant')
 const board = await import('./board')
@@ -38,7 +39,11 @@ board.setConfig(db, 'pin_length', String(PIN.length))
 const sent: { name: string; properties: Record<string, unknown>; profileId?: string }[] = []
 const realFetch = globalThis.fetch
 globalThis.fetch = (async (_url: string | URL, init?: RequestInit) => {
-  sent.push(JSON.parse(String(init?.body)))
+  // the real API shape: { type: 'track', payload: { name, profileId, properties } }
+  const body = JSON.parse(String(init?.body))
+  assert.equal(body.type, 'track')
+  assert.equal(init?.headers && (init.headers as Record<string, string>)['openpanel-client-id'], 'test-client-id')
+  sent.push(body.payload)
   return new Response('ok', { status: 200 })
 }) as typeof fetch
 
@@ -164,7 +169,7 @@ test('a failing OpenPanel request never breaks the API', async () => {
   const res = await call('GET', '/state', { cookies })
   assert.equal(res.status, 200)
   globalThis.fetch = (async (_u: string | URL, init?: RequestInit) => {
-    sent.push(JSON.parse(String(init?.body)))
+    sent.push(JSON.parse(String(init?.body)).payload)
     return new Response('ok', { status: 200 })
   }) as typeof fetch
 })

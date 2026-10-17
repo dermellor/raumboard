@@ -14,15 +14,23 @@ import { createHash } from 'node:crypto'
 import type Database from 'better-sqlite3'
 import { getConfig } from './board'
 
-/** Self-hosted OpenPanel instance; the project key comes from the instance profile. */
+/** Self-hosted OpenPanel instance; project credentials come from the instance profile. */
 const OP_URL = (process.env.RAUMBOARD_OPENPANEL_URL ?? 'https://analytics.12signals.com').replace(/\/$/, '')
-const OP_KEY = process.env.RAUMBOARD_OPENPANEL_KEY?.trim() ?? ''
+/** The project's client id (a UUID, shown in OpenPanel's project settings). Not a secret. */
+const OP_CLIENT_ID = process.env.RAUMBOARD_OPENPANEL_CLIENT_ID?.trim() ?? ''
+/**
+ * OpenPanel attributes browser events by origin, so the project lists its site's
+ * URL. Server-side ingestion authenticates with exactly that origin in the
+ * `Origin` header (this instance has no per-project ingestion secret), which is
+ * what the configured project URL is for.
+ */
+const OP_ORIGIN = (process.env.RAUMBOARD_OPENPANEL_ORIGIN ?? 'https://www.raumboard.de').replace(/\/$/, '')
 
 /** Config key (per-tenant `config` table) that switches tracking off for a school. */
 export const OPT_OUT_KEY = 'analytics_opt_out'
 
-/** Tracking is off entirely without a project key. */
-export const analyticsEnabled = OP_KEY !== ''
+/** Tracking is off entirely without a project client id. */
+export const analyticsEnabled = OP_CLIENT_ID !== ''
 
 type EventProps = Record<string, string | number | boolean>
 
@@ -40,15 +48,22 @@ export function track(boardId: string, db: Database.Database, name: string, prop
   if (isDemoBoard(boardId)) return
   if (getConfig(db, OPT_OUT_KEY) === '1') return
   const body = JSON.stringify({
-    name,
-    // the tenant slug doubles as OpenPanel's profileId, which is what lets the
-    // dashboard group events per school without any personal identifier
-    profileId: boardId,
-    properties: { tenant: boardId, ...properties },
+    type: 'track',
+    payload: {
+      name,
+      // the tenant slug doubles as OpenPanel's profileId, which is what lets the
+      // dashboard group events per school without any personal identifier
+      profileId: boardId,
+      properties: { tenant: boardId, ...properties },
+    },
   })
   fetch(`${OP_URL}/api/track`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'open-panel-api-key': OP_KEY },
+    headers: {
+      'Content-Type': 'application/json',
+      Origin: OP_ORIGIN,
+      'openpanel-client-id': OP_CLIENT_ID,
+    },
     body,
   })
     .then((res) => {

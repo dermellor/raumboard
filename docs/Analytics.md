@@ -20,7 +20,8 @@ anderen Daten dort).
 - **Opt-out pro Schule.** Steht in der `config`-Tabelle der Schule der Schlüssel
   `analytics_opt_out` auf `1`, sendet das Backend für diesen Tenant keine
   Events — serverseitig erzwungen, nicht clientseitig.
-- Ohne `RAUMBOARD_OPENPANEL_KEY` im Instance-Profile ist das Tracking komplett aus.
+- Ohne `RAUMBOARD_OPENPANEL_CLIENT_ID` im Instance-Profile ist das Tracking
+  komplett aus.
 
 ## Events
 
@@ -39,8 +40,12 @@ kann, ohne dass ein personenbezogenes Merkmal nötig wäre.
 
 - `RAUMBOARD_OPENPANEL_URL` — Instanz-URL (Default
   `https://analytics.12signals.com`)
-- `RAUMBOARD_OPENPANEL_KEY` — API-Key des raumboard-Projekts (im Instance-Profile
-  außerhalb des Repos). Ohne Key: kein Tracking.
+- `RAUMBOARD_OPENPANEL_CLIENT_ID` — Client-ID des raumboard-Projekts (eine UUID,
+  in OpenPanel unter dem Projekt zu sehen; kein Secret). Ohne sie: kein Tracking.
+- `RAUMBOARD_OPENPANEL_ORIGIN` — die dem Projekt zugeordnete Site-URL (Default
+  `https://www.raumboard.de`); die Ingestion prüft serverseitige Requests über
+  genau diesen `Origin`-Header, da die Instanz keinen separaten Ingestion-Secret
+  pro Projekt vergibt.
 - Opt-out pro Schule: `config`-Tabelle, Schlüssel `analytics_opt_out`, Wert `1`
   (z. B. per CLI/SQLite setzen).
 

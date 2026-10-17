@@ -481,7 +481,7 @@ Events: `app_open`, `booking`, `return`, `pin_unlock_failed`, `admin_login`
 (details in [`docs/Analytics.md`](docs/Analytics.md)). Every send is
 fire-and-forget (errors logged, never thrown), demo boards are never tracked,
 and a school opts out via the `config` key `analytics_opt_out` — enforced in the
-backend, so `RAUMBOARD_OPENPANEL_KEY` unset means zero tracking. Covered by
+backend, so `RAUMBOARD_OPENPANEL_CLIENT_ID` unset means zero tracking. Covered by
 [`server/analytics.test.ts`](server/analytics.test.ts).
 
 ## Deploy
