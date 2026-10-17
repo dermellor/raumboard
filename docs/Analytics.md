@@ -1,15 +1,17 @@
-# Nutzungsstatistik (OpenPanel)
+# Nutzungsstatistik (serverseitige Events)
 
-Raumboard misst seine eigene Nutzung serverseitig über eine
-[OpenPanel](https://openpanel.dev)-Instanz des Betreibers
-(`analytics.12signals.com`, eigenes Projekt „raumboard", getrennt von allen
-anderen Daten dort).
+Raumboard misst seine eigene Nutzung über serverseitige Events: Das Node-Backend
+POSTet sie an einen konfigurierbaren HTTP-Endpoint (`server/analytics.ts`). Der
+Core kennt die Events, nicht das Auswertungswerkzeug — jede Instanz entscheidet
+in ihrem Instance-Profile, ob und wohin getrackt wird. Ohne `RAUMBOARD_EVENTS_URL`
+ist das Tracking komplett aus; das ist der Default, mit dem ein Self-Hoster ohne
+Konfiguration auskommt.
 
 ## Grundsätze
 
-- **Nur serverseitig.** Events entstehen im Node/Hono-Backend über die
-  OpenPanel-HTTP-API (`server/analytics.ts`). Kein Browser-SDK, kein Cookie,
-  keine IP-Adresse im Frontend oder in den Events.
+- **Nur serverseitig.** Events entstehen im Node/Hono-Backend und werden per
+  HTTP-POST gesendet. Kein Browser-SDK, kein Cookie, keine IP-Adresse im
+  Frontend oder in den Events.
 - **Datenminimierung.** Ein Event trägt nur: Tenant-Slug, Board-Pseudonym
   (gekürzter Hash des Gerätetokens), Lernort-ID (Raum-ID), Zeitstempel und
   Zähler/Erfolg-Misserfolg. Niemals Namen — nicht einmal Vorname + Initial —
@@ -20,8 +22,6 @@ anderen Daten dort).
 - **Opt-out pro Schule.** Steht in der `config`-Tabelle der Schule der Schlüssel
   `analytics_opt_out` auf `1`, sendet das Backend für diesen Tenant keine
   Events — serverseitig erzwungen, nicht clientseitig.
-- Ohne `RAUMBOARD_OPENPANEL_CLIENT_ID` im Instance-Profile ist das Tracking
-  komplett aus.
 
 ## Events
 
@@ -33,22 +33,34 @@ anderen Daten dort).
 | `pin_unlock_failed` | fehlgeschlagene `POST /api/pin` bzw. `POST /api/teacher/verify` | `tenant`, `gate` (`board` / `verwaltung`) |
 | `admin_login` | erfolgreiche `POST /api/login` | `tenant`, `role` (`owner` / `admin`) |
 
-`profileId` ist der Tenant-Slug, damit das Dashboard pro Schule gruppieren
-kann, ohne dass ein personenbezogenes Merkmal nötig wäre.
-
 ## Konfiguration
 
-- `RAUMBOARD_OPENPANEL_URL` — Instanz-URL (Default
-  `https://analytics.12signals.com`)
-- `RAUMBOARD_OPENPANEL_CLIENT_ID` — Client-ID des raumboard-Projekts (eine UUID,
-  in OpenPanel unter dem Projekt zu sehen; kein Secret). Ohne sie: kein Tracking.
-- `RAUMBOARD_OPENPANEL_ORIGIN` — die dem Projekt zugeordnete Site-URL (Default
-  `https://www.raumboard.de`); die Ingestion prüft serverseitige Requests über
-  genau diesen `Origin`-Header, da die Instanz keinen separaten Ingestion-Secret
-  pro Projekt vergibt.
+- `RAUMBOARD_EVENTS_URL` — komplette URL des Endpoints, an den gepostet wird.
+  Ohne sie: kein Tracking (Default).
+- `RAUMBOARD_EVENTS_FORMAT` — Body-Form: `plain` (Default) sendet
+  `{ name, tenant, properties }`; `openpanel` wickelt das in die Ingestion-Envelope
+  `{ type: 'track', payload: { name, profileId, properties } }` einer
+  [OpenPanel](https://openpanel.dev)-Instanz (der Tenant-Slug wird zum
+  `profileId`, was das Dashboard pro Schule gruppieren lässt, ohne dass ein
+  personenbezogenes Merkmal nötig wäre).
+- `RAUMBOARD_EVENTS_HEADERS` — zusätzliche Request-Header als JSON-Objekt, für
+  Endpoints, die per Header authentifizieren. Ungültiges JSON schaltet das
+  Tracking mit Warnung aus, statt halb konfiguriert zu senden.
 - Opt-out pro Schule: `config`-Tabelle, Schlüssel `analytics_opt_out`, Wert `1`
   (z. B. per CLI/SQLite setzen).
 
+### Rezept: OpenPanel (self-hosted)
+
+```
+RAUMBOARD_EVENTS_URL=https://<instanz>/api/track
+RAUMBOARD_EVENTS_FORMAT=openpanel
+RAUMBOARD_EVENTS_HEADERS={"Origin":"https://www.raumboard.de","openpanel-client-id":"<projekt-uuid>"}
+```
+
+Die Client-ID ist eine UUID aus den Projekteinstellungen, kein Secret; die
+Ingestion prüft genau diesen `Origin`-Header, sofern die Instanz keinen
+separaten Ingestion-Secret pro Projekt vergibt.
+
 Abgedeckt durch [`server/analytics.test.ts`](../server/analytics.test.ts):
-Events je Aktion, Dedupe, Opt-out, und dass ein scheiternder OpenPanel-Request
+Events je Aktion, Dedupe, Opt-out, und dass ein scheiternder Event-Request
 die API nie blockiert oder bricht.

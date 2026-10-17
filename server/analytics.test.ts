@@ -19,9 +19,12 @@ process.env.RAUMBOARD_DEFAULT_TENANT = TENANT
 process.env.RAUMBOARD_DEMO_TENANT = ''
 process.env.RAUMBOARD_NO_LISTEN = '1'
 process.env.RAUMBOARD_SECRET = 'test-secret-test-secret-test-secret'
-process.env.RAUMBOARD_OPENPANEL_URL = 'http://openpanel.test'
-process.env.RAUMBOARD_OPENPANEL_CLIENT_ID = 'test-client-id'
-process.env.RAUMBOARD_OPENPANEL_ORIGIN = 'https://www.raumboard.de'
+process.env.RAUMBOARD_EVENTS_URL = 'http://events.test/sink'
+process.env.RAUMBOARD_EVENTS_FORMAT = 'openpanel'
+process.env.RAUMBOARD_EVENTS_HEADERS = JSON.stringify({
+  'openpanel-client-id': 'test-client-id',
+  Origin: 'https://www.raumboard.de',
+})
 
 const { openTenant } = await import('./tenant')
 const board = await import('./board')
@@ -35,11 +38,11 @@ board.createUser(db, EMAIL, hashSecret(PASSWORD), 'owner')
 board.setConfig(db, 'pin_hash', hashSecret(PIN))
 board.setConfig(db, 'pin_length', String(PIN.length))
 
-// record every outgoing OpenPanel request instead of sending it
-const sent: { name: string; properties: Record<string, unknown>; profileId?: string }[] = []
+// record every outgoing event request instead of sending it
+const sent: { name: string; properties: Record<string, unknown>; profileId?: string; tenant?: string }[] = []
 const realFetch = globalThis.fetch
 globalThis.fetch = (async (_url: string | URL, init?: RequestInit) => {
-  // the real API shape: { type: 'track', payload: { name, profileId, properties } }
+  // openpanel format: { type: 'track', payload: { name, profileId, properties } }
   const body = JSON.parse(String(init?.body))
   assert.equal(body.type, 'track')
   assert.equal(init?.headers && (init.headers as Record<string, string>)['openpanel-client-id'], 'test-client-id')
@@ -160,7 +163,7 @@ test('the tenant opt-out silences every event', async () => {
   board.setConfig(db, OPT_OUT_KEY, '0')
 })
 
-test('a failing OpenPanel request never breaks the API', async () => {
+test('a failing event endpoint never breaks the API', async () => {
   resetAnalyticsForTest()
   globalThis.fetch = (async () => {
     throw new Error('netz weg')

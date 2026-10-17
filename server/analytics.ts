@@ -1,7 +1,9 @@
 /**
- * Server-side OpenPanel tracking. There is deliberately no browser SDK: events
- * arise in the Node backend via OpenPanel's HTTP API, so no script, cookie or
- * IP ever reaches a board, and a school's opt-out cannot be bypassed client-side.
+ * Server-side usage events. There is deliberately no browser SDK: events
+ * arise in the Node backend and are POSTed to whatever HTTP endpoint the
+ * instance profile names — the core knows the events, not the tool that
+ * evaluates them. No script, cookie or IP ever reaches a board, and a
+ * school's opt-out cannot be bypassed client-side.
  *
  * Data minimization is the contract here (AGENTS.md): events carry only the
  * tenant slug, a board pseudonym (hash of the device token — no name, no IP),
@@ -14,23 +16,46 @@ import { createHash } from 'node:crypto'
 import type Database from 'better-sqlite3'
 import { getConfig } from './board'
 
-/** Self-hosted OpenPanel instance; project credentials come from the instance profile. */
-const OP_URL = (process.env.RAUMBOARD_OPENPANEL_URL ?? 'https://analytics.12signals.com').replace(/\/$/, '')
-/** The project's client id (a UUID, shown in OpenPanel's project settings). Not a secret. */
-const OP_CLIENT_ID = process.env.RAUMBOARD_OPENPANEL_CLIENT_ID?.trim() ?? ''
 /**
- * OpenPanel attributes browser events by origin, so the project lists its site's
- * URL. Server-side ingestion authenticates with exactly that origin in the
- * `Origin` header (this instance has no per-project ingestion secret), which is
- * what the configured project URL is for.
+ * Where events are POSTed to (a complete URL). Unset means tracking is
+ * completely off — the default, which is what a self-hoster gets.
  */
-const OP_ORIGIN = (process.env.RAUMBOARD_OPENPANEL_ORIGIN ?? 'https://www.raumboard.de').replace(/\/$/, '')
+const EVENTS_URL = process.env.RAUMBOARD_EVENTS_URL?.trim() ?? ''
+/**
+ * Body format: `plain` (default) sends `{ name, tenant, properties }`;
+ * `openpanel` wraps that in OpenPanel's `{ type: 'track', payload: … }`
+ * ingestion envelope and maps the tenant to its `profileId`.
+ */
+const EVENTS_FORMAT = process.env.RAUMBOARD_EVENTS_FORMAT?.trim() || 'plain'
+/**
+ * Extra request headers as a JSON object, e.g. for an ingestion endpoint
+ * that authenticates per header (OpenPanel checks `Origin` and
+ * `openpanel-client-id`). Invalid JSON disables tracking with a warning
+ * rather than sending headers half-configured.
+ */
+const EVENTS_HEADERS = (() => {
+  const raw = process.env.RAUMBOARD_EVENTS_HEADERS?.trim()
+  if (!raw) return {} as Record<string, string>
+  try {
+    const parsed = JSON.parse(raw)
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as Record<string, string>)
+      : null
+  } catch {
+    return null
+  }
+})()
 
 /** Config key (per-tenant `config` table) that switches tracking off for a school. */
 export const OPT_OUT_KEY = 'analytics_opt_out'
 
-/** Tracking is off entirely without a project client id. */
-export const analyticsEnabled = OP_CLIENT_ID !== ''
+if (EVENTS_HEADERS === null) {
+  console.warn('analytics: RAUMBOARD_EVENTS_HEADERS ist kein JSON-Objekt — Tracking bleibt aus.')
+}
+
+/** Tracking is off entirely without a configured endpoint (or valid headers). */
+export const analyticsEnabled =
+  EVENTS_URL !== '' && EVENTS_FORMAT !== '' && EVENTS_HEADERS !== null
 
 type EventProps = Record<string, string | number | boolean>
 
@@ -47,30 +72,26 @@ export function track(boardId: string, db: Database.Database, name: string, prop
   if (!analyticsEnabled) return
   if (isDemoBoard(boardId)) return
   if (getConfig(db, OPT_OUT_KEY) === '1') return
-  const body = JSON.stringify({
-    type: 'track',
-    payload: {
-      name,
-      // the tenant slug doubles as OpenPanel's profileId, which is what lets the
-      // dashboard group events per school without any personal identifier
-      profileId: boardId,
-      properties: { tenant: boardId, ...properties },
-    },
-  })
-  fetch(`${OP_URL}/api/track`, {
+  const props = { tenant: boardId, ...properties }
+  const body =
+    EVENTS_FORMAT === 'openpanel'
+      ? // the tenant slug doubles as the profileId, which is what lets a
+        // dashboard group events per school without any personal identifier
+        JSON.stringify({
+          type: 'track',
+          payload: { name, profileId: boardId, properties: props },
+        })
+      : JSON.stringify({ name, tenant: boardId, properties: props })
+  fetch(EVENTS_URL, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Origin: OP_ORIGIN,
-      'openpanel-client-id': OP_CLIENT_ID,
-    },
+    headers: { 'Content-Type': 'application/json', ...EVENTS_HEADERS },
     body,
   })
     .then((res) => {
-      if (!res.ok) console.warn(`openpanel: ${name} abgelehnt (HTTP ${res.status})`)
+      if (!res.ok) console.warn(`analytics: ${name} abgelehnt (HTTP ${res.status})`)
     })
     .catch((err) => {
-      console.warn(`openpanel: ${name} nicht gesendet (${(err as Error).message})`)
+      console.warn(`analytics: ${name} nicht gesendet (${(err as Error).message})`)
     })
 }
 

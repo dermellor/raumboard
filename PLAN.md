@@ -14,9 +14,11 @@ Opt-out pro Tenant, keine Namen/IPs.
   - [x] `pin_unlock_failed` (PIN-Gate Board + Verwaltung)
   - [x] `admin_login`
 - [x] Properties fixieren: nur Tenant-Slug, Board-Pseudonym, Lernort-Slug, Zähler — keine Namen, keine IPs, Demo-Boards werden nie getrackt
-- [x] `.env.example`: `RAUMBOARD_OPENPANEL_URL` / `RAUMBOARD_OPENPANEL_CLIENT_ID` /
-      `RAUMBOARD_OPENPANEL_ORIGIN` (Ingestion authentifiziert über Client-ID + Origin-Header,
-      die Instanz vergibt keinen separaten Ingestion-Secret — mit Marcel geklärt)
+- [x] `.env.example`: `RAUMBOARD_EVENTS_URL` / `RAUMBOARD_EVENTS_FORMAT` /
+      `RAUMBOARD_EVENTS_HEADERS` — generischer Event-Endpoint, OpenPanel nur als
+      Format-Option (openpanel-Envelope, Ingestion authentifiziert über
+      Client-ID + Origin-Header; mit Marcel geklärt und statt der ursprünglichen
+      OpenPanel-Festdrahtung eingebaut)
 - [x] Tests `server/analytics.test.ts` (Events, Dedupe, Opt-out, Fetch-Fehler wirft nicht)
 - [x] Doku: `docs/Analytics.md` (Events + Opt-out), TOM-Baustein „Nutzungsstatistik", AGENTS.md-Abschnitt
 - [ ] OpenPanel-Projekt „raumboard" auf analytics.12signals.com anlegen (Operator-Handgriff, außerhalb des Repos — API-Key landet im Instance-Profile)
