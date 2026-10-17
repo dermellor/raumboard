@@ -43,3 +43,4 @@ scripts/deploy-bunny.py
 .env
 .env.*
 !.env.example
+.cockpit-services.json

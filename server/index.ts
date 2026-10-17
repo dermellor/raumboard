@@ -29,6 +29,7 @@ import {
   resetDemoBoard,
   startDemoSweeper,
 } from './demo'
+import { boardPseudonym, track, trackAppOpen } from './analytics'
 import { broadcast, lockBoard, register } from './ws'
 import { buildSeed } from '../src/seed'
 
@@ -159,6 +160,13 @@ api.get('/state', (c) => {
   const boardId = c.get('boardId')
   const db = openBoard(boardId)
   const { isAdmin, hasBoard, account } = authInfo(c, boardId)
+  // Server-side `app_open`: the state fetch with an unlocked device is the
+  // moment a board opens. Deduped per board pseudonym (analytics.ts), so the
+  // polling/reconnects of one session count once.
+  if (hasBoard && !isDemoBoard(boardId)) {
+    const pseudonym = boardPseudonym(getCookie(c, 'rb_board'))
+    if (pseudonym) trackAppOpen(boardId, db, pseudonym)
+  }
   return c.json({
     // A locked device receives no school data. The remaining fields are only
     // what the lock screen needs before the PIN can be entered.
@@ -199,6 +207,8 @@ api.post('/login', async (c) => {
     ...cookieOpts(),
     maxAge: ADMIN_TTL,
   })
+  // usage statistic only — the role, never the email (data minimization)
+  track(boardId, db, 'admin_login', { role: user.role })
   return c.json({ ok: true })
 })
 
@@ -223,8 +233,10 @@ api.post('/pin', async (c) => {
   const db = openBoard(boardId)
   const { pin } = await c.req.json<{ pin?: string }>()
   const storedHash = board.getConfig(db, 'pin_hash')
-  if (!pin || !storedHash || !verifySecret(pin.trim(), storedHash))
+  if (!pin || !storedHash || !verifySecret(pin.trim(), storedHash)) {
+    track(boardId, db, 'pin_unlock_failed', { gate: 'board' })
     return c.json({ error: 'PIN falsch' }, 401)
+  }
   setCookie(c, 'rb_board', makeToken(boardId, 'board', unlockEpoch(db), BOARD_TTL), {
     ...cookieOpts(),
     maxAge: BOARD_TTL,
@@ -245,8 +257,10 @@ api.post('/teacher/verify', deviceGuard, async (c) => {
   const db = openBoard(boardId)
   const { pin } = await c.req.json<{ pin?: string }>()
   const storedHash = board.getConfig(db, 'pin_hash')
-  if (!pin || !storedHash || !verifySecret(pin.trim(), storedHash))
+  if (!pin || !storedHash || !verifySecret(pin.trim(), storedHash)) {
+    track(boardId, db, 'pin_unlock_failed', { gate: 'verwaltung' })
     return c.json({ error: 'PIN falsch' }, 401)
+  }
   return c.json({ token: makeToken(boardId, 'teacher', unlockEpoch(db), TEACHER_TTL) })
 })
 
@@ -297,6 +311,7 @@ api.post('/book', async (c) => {
   if (!kidId || !roomId) return c.json({ error: 'kidId/roomId fehlt' }, 400)
   const result = board.book(openBoard(boardId), kidId, roomId)
   if (!result.ok) return c.json(result, 409)
+  track(boardId, openBoard(boardId), 'booking', { room: roomId })
   broadcast(boardId, stateMessage(boardId))
   return c.json(result)
 })
@@ -305,7 +320,11 @@ api.post('/unbook', async (c) => {
   const boardId = c.get('boardId')
   const { kidId } = await c.req.json<{ kidId?: string }>()
   if (!kidId) return c.json({ error: 'kidId fehlt' }, 400)
-  board.unbook(openBoard(boardId), kidId)
+  const db = openBoard(boardId)
+  // where the kid is coming back from — the room id, never a name
+  const room = board.loadState(db).kids.find((k) => k.id === kidId)?.currentRoomId ?? null
+  board.unbook(db, kidId)
+  track(boardId, db, 'return', room ? { room } : {})
   broadcast(boardId, stateMessage(boardId))
   return c.json({ ok: true })
 })
