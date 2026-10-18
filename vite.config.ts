@@ -20,6 +20,9 @@ export default defineConfig({
   server: {
     port: WEB_PORT,
     strictPort: true,
+    // Cockpit-Previews: tailscale serve leitet den Browser-Host 1:1 weiter,
+    // Vite blockt ihn ohne Allowlist (DNS-Rebinding-Schutz).
+    allowedHosts: ['mellors.tail594768.ts.net'],
     proxy: {
       // local API server (`npm run dev:api`). changeOrigin stays off: the API
       // resolves the tenant from the Host header, so it has to survive the hop.
