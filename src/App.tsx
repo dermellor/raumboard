@@ -8,6 +8,7 @@ import { Home } from './views/Home'
 import { KlassenBoard } from './views/KlassenBoard'
 import { RaumSicht } from './views/RaumSicht'
 import { Verwaltung } from './views/verwaltung/VerwaltungShell'
+import { OperatorAdmin } from './views/OperatorAdmin'
 
 /** Old addresses (`#/admin`, `#/verwaltung/klassen`, …) land on their successor. */
 function HashRedirect({ to }: { to: string }) {
@@ -17,7 +18,19 @@ function HashRedirect({ to }: { to: string }) {
   return null
 }
 
+declare global {
+  interface Window {
+    __RAUMBOARD_OPERATOR__?: boolean
+  }
+}
+
 export function App() {
+  if (window.__RAUMBOARD_OPERATOR__ || window.location.pathname === '/operator')
+    return <OperatorAdmin />
+  return <BoardApp />
+}
+
+function BoardApp() {
   const route = useRoute()
   const meta = useMeta()
 
