@@ -34,3 +34,9 @@ Operator-Aktionen und Plattformzustand sicher hinter einem separaten Operator-Lo
 - [x] `bash -n deploy/backup.sh deploy/deploy.sh` und `node --check scripts/update-operator-status.mjs` – Betriebs-Skripte syntaktisch gültig.
 - [x] Vorschau auf Port 3650 mit Operator-Login, fünf Statusvarianten, KPI-Aggregation, Logs und Wartungsmodus geprüft.
 - [x] Produktionsroute `/operator` über den Hono-Server sowie 401 ohne Operator-Cookie geprüft.
+
+## QA-Nacharbeit
+
+- [x] Vorschau-API dauerhaft auf dem registrierten Port 3651 betreiben.
+- [x] Browser-Pfad `/api/operator/*` über die veröffentlichte Vorschau bis zum API-Dienst prüfen.
+- [x] Operator-Login, Übersicht, Wartungsmodus und Backup-Logs über denselben Proxy erneut blackbox-testen.

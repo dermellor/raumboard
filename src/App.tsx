@@ -9,6 +9,7 @@ import { KlassenBoard } from './views/KlassenBoard'
 import { RaumSicht } from './views/RaumSicht'
 import { Verwaltung } from './views/verwaltung/VerwaltungShell'
 import { OperatorAdmin } from './views/OperatorAdmin'
+import { isOperatorPath } from './operatorPath'
 
 /** Old addresses (`#/admin`, `#/verwaltung/klassen`, …) land on their successor. */
 function HashRedirect({ to }: { to: string }) {
@@ -25,7 +26,7 @@ declare global {
 }
 
 export function App() {
-  if (window.__RAUMBOARD_OPERATOR__ || window.location.pathname === '/operator')
+  if (window.__RAUMBOARD_OPERATOR__ || isOperatorPath(window.location.pathname, import.meta.env.BASE_URL))
     return <OperatorAdmin />
   return <BoardApp />
 }
