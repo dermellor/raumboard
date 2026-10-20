@@ -32,6 +32,17 @@ import {
 import { boardPseudonym, track, trackAppOpen } from './analytics'
 import { broadcast, lockBoard, register } from './ws'
 import { buildSeed } from '../src/seed'
+import {
+  authenticateOperator,
+  backupLog,
+  makeOperatorToken,
+  operatorEnabled,
+  platformSnapshot,
+  recordUsage,
+  setMaintenance,
+  verifyOperatorToken,
+} from './operator'
+import { spawn } from 'node:child_process'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const DIST = path.join(HERE, '..', 'dist')
@@ -166,6 +177,7 @@ api.get('/state', (c) => {
   if (hasBoard && !isDemoBoard(boardId)) {
     const pseudonym = boardPseudonym(getCookie(c, 'rb_board'))
     if (pseudonym) trackAppOpen(boardId, db, pseudonym)
+    recordUsage(db, 'app_open', pseudonym)
   }
   return c.json({
     // A locked device receives no school data. The remaining fields are only
@@ -312,6 +324,7 @@ api.post('/book', async (c) => {
   const result = board.book(openBoard(boardId), kidId, roomId)
   if (!result.ok) return c.json(result, 409)
   track(boardId, openBoard(boardId), 'booking', { room: roomId })
+  if (!isDemoBoard(boardId)) recordUsage(openBoard(boardId), 'activity')
   broadcast(boardId, stateMessage(boardId))
   return c.json(result)
 })
@@ -325,6 +338,7 @@ api.post('/unbook', async (c) => {
   const room = board.loadState(db).kids.find((k) => k.id === kidId)?.currentRoomId ?? null
   board.unbook(db, kidId)
   track(boardId, db, 'return', room ? { room } : {})
+  if (!isDemoBoard(boardId)) recordUsage(db, 'activity')
   broadcast(boardId, stateMessage(boardId))
   return c.json({ ok: true })
 })
@@ -603,6 +617,56 @@ api.post('/accounts/:id/reset-password', (c) => {
   return c.json({ ok: true, password })
 })
 
+// --- hosted-platform operator cockpit -----------------------------------------
+// Deliberately mounted before the tenant API: it exists only when an operator
+// password is configured and never accepts a school account, PIN or cookie.
+const operatorApi = new Hono()
+operatorApi.use('*', async (c, next) => {
+  if (!operatorEnabled) return c.json({ error: 'not found' }, 404)
+  if (c.req.path.endsWith('/login')) return next()
+  if (!verifyOperatorToken(getCookie(c, 'rb_operator')))
+    return c.json({ error: 'operator login required' }, 401)
+  await next()
+})
+operatorApi.post('/login', async (c) => {
+  if (!operatorEnabled) return c.json({ error: 'not found' }, 404)
+  const { password } = await c.req.json<{ password?: string }>()
+  if (!password || !authenticateOperator(password)) return c.json({ error: 'login failed' }, 401)
+  setCookie(c, 'rb_operator', makeOperatorToken(), {
+    ...cookieOpts(),
+    maxAge: 12 * 3600,
+  })
+  return c.json({ ok: true })
+})
+operatorApi.post('/logout', (c) => {
+  deleteCookie(c, 'rb_operator', cookieOpts())
+  return c.json({ ok: true })
+})
+operatorApi.get('/overview', (c) => c.json(platformSnapshot()))
+operatorApi.get('/instances/:slug/logs', (c) => c.json({ log: backupLog(c.req.param('slug')) }))
+operatorApi.post('/instances/:slug/maintenance', async (c) => {
+  const { enabled } = await c.req.json<{ enabled?: boolean }>()
+  try {
+    setMaintenance(c.req.param('slug'), Boolean(enabled))
+    return c.json({ ok: true })
+  } catch (error) {
+    return c.json({ error: error instanceof Error ? error.message : 'Aktion fehlgeschlagen' }, 400)
+  }
+})
+operatorApi.post('/instances/:slug/backup', (c) => {
+  const slug = c.req.param('slug')
+  if (!platformSnapshot().instances.some((instance) => instance.slug === slug))
+    return c.json({ error: 'Instanz nicht gefunden' }, 404)
+  const child = spawn(path.join(HERE, '..', 'deploy', 'backup.sh'), [], {
+    detached: true,
+    stdio: 'ignore',
+    env: { ...process.env, BACKUP_ONLY_SLUG: slug },
+  })
+  child.unref()
+  return c.json({ ok: true }, 202)
+})
+app.route('/api/operator', operatorApi)
+
 app.route('/api', api)
 
 // --- static frontend -----------------------------------------------------------
@@ -628,6 +692,11 @@ app.use(
 )
 
 app.get('*', (c) => {
+  if (c.req.path === '/operator' || c.req.path === '/operator/') {
+    if (!operatorEnabled) return c.text('Nicht gefunden', 404)
+    if (!indexHtml) return c.text('frontend build fehlt (npm run build)', 500)
+    return c.html(indexHtml.replace('</head>', '<script>window.__RAUMBOARD_OPERATOR__=true</script></head>'))
+  }
   const slug = slugFromHost(c.req.header('host'))
   if (!slug) return c.html(LANDING)
   const demo = slug === DEMO_TENANT

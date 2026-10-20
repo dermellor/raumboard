@@ -22,6 +22,10 @@ ENV_FILE="${RAUMBOARD_ENV:-/opt/raumboard/.env}"
 
 DATA="${BACKUP_DATA:-/opt/raumboard/data}"
 WORK="${BACKUP_WORK:-/opt/raumboard/backups}"
+STATUS_SCRIPT="${RAUMBOARD_STATUS_SCRIPT:-/opt/raumboard/app/scripts/update-operator-status.mjs}"
+if [ ! -f "$STATUS_SCRIPT" ]; then
+  STATUS_SCRIPT="$(cd "$(dirname "$0")/.." && pwd)/scripts/update-operator-status.mjs"
+fi
 STAMP=$(date +%F)
 ZONE="${BACKUP_STORAGE_ZONE:?set BACKUP_STORAGE_ZONE (object-storage zone/bucket)}"
 STORAGE_HOST="${BACKUP_STORAGE_HOST:-storage.bunnycdn.com}"
@@ -35,9 +39,21 @@ fi
 
 mkdir -p "$WORK"
 shopt -s nullglob
-for db in "$DATA"/*.db; do
+if [ -n "${BACKUP_ONLY_SLUG:-}" ]; then
+  if [[ ! "$BACKUP_ONLY_SLUG" =~ ^[a-z0-9][a-z0-9-]{0,62}$ ]]; then
+    echo "FEHLER: ungültiger Instanz-Slug" >&2
+    exit 2
+  fi
+  databases=("$DATA/$BACKUP_ONLY_SLUG.db")
+else
+  databases=("$DATA"/*.db)
+fi
+
+backup_one() {
+  local db="$1" slug out
   slug=$(basename "$db" .db)
   out="$WORK/${slug}-${STAMP}.db"
+  node "$STATUS_SCRIPT" "$slug" running "Backup gestartet"
   sqlite3 "$db" ".backup '$out'"
   gzip -f "$out"
   # encrypt at rest before it ever leaves the server
@@ -48,6 +64,17 @@ for db in "$DATA"/*.db; do
     --data-binary @"$out.gz.enc"
   rm -f "$out.gz" "$out.gz.enc"
   echo "backup ok (verschlüsselt): $slug ($STAMP)"
+}
+
+for db in "${databases[@]}"; do
+  [ -f "$db" ] || continue
+  slug=$(basename "$db" .db)
+  if backup_one "$db"; then
+    node "$STATUS_SCRIPT" "$slug" ok "Verschlüsselt hochgeladen"
+  else
+    node "$STATUS_SCRIPT" "$slug" failed "Backup fehlgeschlagen"
+    exit 1
+  fi
 done
 
 # prune local leftovers older than 2 days (uploads are the real archive)

@@ -30,7 +30,7 @@ npm run build
 rsync -az --delete \
   --exclude node_modules --exclude data \
   package.json package-lock.json tsconfig.json tsconfig.server.json \
-  dist server src \
+  dist server src scripts/update-operator-status.mjs \
   "$HOST:$APP/"
 
 ssh "$HOST" "cd $APP && npm ci --omit=dev --no-audit --no-fund && chown -R $SVC_USER:$SVC_USER $APP && systemctl restart $SERVICE && sleep 2 && systemctl is-active $SERVICE && curl -sf -o /dev/null http://127.0.0.1:3211/ask?domain=$DOMAIN && echo 'deploy ok'"
