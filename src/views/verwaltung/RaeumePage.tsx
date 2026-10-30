@@ -262,6 +262,7 @@ export function RaeumePage() {
               </button>
               <div className="field">
                 <button
+                  className="primary"
                   disabled={timesDraft.some((w) => !w.days.length || !w.start || !w.end || w.start >= w.end)}
                   onClick={() => {
                     updateRoom(room.id, { windows: timesDraft })

@@ -761,6 +761,21 @@ h1 {
   margin: 1rem 0;
 }
 
+/* primary confirm action inside admin modals: the one filled, green button */
+.admin button.primary {
+  background: #16a34a;
+  border-color: #16a34a;
+  color: #fff;
+  font-weight: 700;
+  padding-inline: 1.25rem;
+}
+
+.admin button.primary:disabled {
+  background: var(--line);
+  border-color: var(--line);
+  color: var(--ink-soft);
+}
+
 /* --- add button in table header ------------------------------------------------ */
 
 .admin th.th-add,

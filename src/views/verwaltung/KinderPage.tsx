@@ -214,6 +214,7 @@ export function KinderPage() {
             />
           </div>
           <button
+            className="primary"
             disabled={!editName.trim() || editName.trim() === editKlass.name && editEmoji === (editKlass.emoji ?? '')}
             onClick={() => {
               updateKlass(editKlass.id, { name: editName.trim(), emoji: editEmoji })

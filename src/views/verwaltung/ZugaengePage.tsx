@@ -83,7 +83,7 @@ function CredentialsSection({ password }: { password: string }) {
             />
           </div>
           {error && <p className="form-error">{error}</p>}
-          <button disabled={!next || !repeat} onClick={() => void submitPassword()}>
+          <button className="primary" disabled={!next || !repeat} onClick={() => void submitPassword()}>
             speichern
           </button>
         </Modal>
