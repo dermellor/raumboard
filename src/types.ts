@@ -12,6 +12,18 @@ export type Kid = {
   currentRoomId: string | null // null = own classroom
 }
 
+/**
+ * When a Lernort (e.g. an AG) is offered only at certain times: a list of
+ * weekly windows. `days` are ISO weekdays (1 = Monday … 7 = Sunday),
+ * `start`/`end` are `HH:MM` local school time. Empty or undefined means the
+ * room is bookable whenever it is open (the normal case).
+ */
+export type TimeWindow = {
+  days: number[]
+  start: string
+  end: string
+}
+
 export type Room = {
   id: string
   name: string
@@ -21,6 +33,7 @@ export type Room = {
   // which classes may book here: every class ('all', also future ones) or a
   // list of klassIds (e.g. the two classes sharing one cluster's hallway desks)
   scope: 'all' | string[]
+  windows?: TimeWindow[]
 }
 
 export type BoardState = {

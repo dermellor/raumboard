@@ -3,6 +3,7 @@ import { firstName } from './displayName'
 import { homeVars, roomVars } from './roomColor'
 import { Symbol } from './Symbol'
 import { book, canBook, occupancy, unbook } from './store'
+import { nowPoint } from './nowPoint'
 import { useBoard } from './useBoard'
 import type { Kid } from './types'
 
@@ -40,7 +41,7 @@ export function RoomPicker({ kid, onClose }: { kid: Kid; onClose: () => void }) 
           {state.rooms
             .filter((r) => r.scope === 'all' || r.scope.includes(kid.klassId))
             .map((room) => {
-              const check = canBook(kid, room, state)
+              const check = canBook(kid, room, state, nowPoint())
               const here = kid.currentRoomId === room.id
               return (
                 <button

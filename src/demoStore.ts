@@ -1,4 +1,5 @@
 import { canBook } from './boardLogic'
+import { nowPoint } from './nowPoint'
 import { buildSeed } from './seed'
 import type { BoardStore, ImportResult, StoreMeta } from './storeTypes'
 import type { BoardState, BookResult, Kid, Klass, Room } from './types'
@@ -68,7 +69,7 @@ export const demoStore: BoardStore = {
     const kid = state.kids.find((k) => k.id === kidId)
     const room = state.rooms.find((r) => r.id === roomId)
     if (!kid || !room) return { ok: false, reason: 'Kind oder Raum nicht gefunden' }
-    const check = canBook(kid, room, state)
+    const check = canBook(kid, room, state, nowPoint())
     if (!check.ok) return check
     commit({
       ...state,
@@ -93,8 +94,8 @@ export const demoStore: BoardStore = {
     commit(buildSeed())
   },
 
-  addRoom(name, emoji, capacity, scope) {
-    const room: Room = { id: slug(name), name, emoji, capacity, isOpen: true, scope }
+  addRoom(name, emoji, capacity, scope, windows) {
+    const room: Room = { id: slug(name), name, emoji, capacity, isOpen: true, scope, windows }
     commit({ ...state, rooms: [...state.rooms, room] })
   },
 

@@ -1219,3 +1219,35 @@ h1 {
   font-weight: 600;
 }
 
+
+/* --- time windows editor (AG Lernorte, room table's „Zeiten") ---------------- */
+
+.hint {
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+  margin: 0 0 0.75rem;
+}
+
+.window-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.day-toggles {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.day {
+  min-width: 2.6rem;
+  padding: 0.45rem 0.3rem;
+  border-radius: 0.5rem;
+  background: none;
+}
+
+.day.on {
+  background: #16a34a;
+  color: white;
+}

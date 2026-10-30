@@ -412,9 +412,16 @@ api.post('/admin/import', async (c) => {
 
 /** Verwaltung CRUD — teacher level (see BOARD_PATHS). */
 api.post('/rooms', async (c) => {
-  const { name, emoji, capacity, scope } = await c.req.json()
+  const { name, emoji, capacity, scope, windows } = await c.req.json()
   if (!name?.trim()) return c.json({ error: 'name fehlt' }, 400)
-  board.addRoom(openBoard(c.get('boardId')), name.trim(), emoji || '🚪', Number(capacity) || 0, board.normalizeScope(scope))
+  board.addRoom(
+    openBoard(c.get('boardId')),
+    name.trim(),
+    emoji || '🚪',
+    Number(capacity) || 0,
+    board.normalizeScope(scope),
+    board.normalizeWindows(windows),
+  )
   broadcast(c.get('boardId'), stateMessage(c.get('boardId')))
   return c.json({ ok: true })
 })

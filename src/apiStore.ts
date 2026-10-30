@@ -1,4 +1,5 @@
 import { canBook } from './boardLogic'
+import { nowPoint } from './nowPoint'
 import type {
   AuthResult,
   BoardStore,
@@ -177,7 +178,7 @@ export const apiStore: BoardStore = {
     const kid = state.kids.find((k) => k.id === kidId)
     const room = state.rooms.find((r) => r.id === roomId)
     if (!kid || !room) return { ok: false, reason: 'Kind oder Raum nicht gefunden' }
-    const check = canBook(kid, room, state)
+    const check = canBook(kid, room, state, nowPoint())
     if (!check.ok) return check
     // optimistic: instant feedback on the whiteboard, server broadcast corrects races
     state = {
@@ -205,8 +206,8 @@ export const apiStore: BoardStore = {
     mutate('/api/reseed')
   },
 
-  addRoom(name, emoji, capacity, scope) {
-    mutate('/api/rooms', { name, emoji, capacity, scope }, true)
+  addRoom(name, emoji, capacity, scope, windows) {
+    mutate('/api/rooms', { name, emoji, capacity, scope, windows }, true)
   },
   updateRoom(roomId, patch) {
     void request('PATCH', `/api/rooms/${encodeURIComponent(roomId)}`, patch, true)

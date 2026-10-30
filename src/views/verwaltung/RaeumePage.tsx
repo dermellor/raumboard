@@ -1,6 +1,6 @@
-import { Ban, ChevronDown, CircleCheck, Plus, Trash2 } from 'lucide-react'
+import { Ban, ChevronDown, CircleCheck, Clock, Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
-import type { Klass, Room } from '../../types'
+import type { Klass, Room, TimeWindow } from '../../types'
 import { EmojiButton } from '../../EmojiButton'
 import { Modal } from '../../components'
 import { occupancy } from '../../store'
@@ -14,6 +14,19 @@ function scopeLabel(scope: Room['scope'], klasses: Klass[]): string {
   return scope.map((id) => klasses.find((c) => c.id === id)?.name ?? id).join(', ')
 }
 
+/** The days of a window, short: "Mo, Do". */
+const DAY_NAMES = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
+
+function windowDays(w: TimeWindow): string {
+  return w.days.map((d) => DAY_NAMES[d - 1]).join(', ')
+}
+
+/** "immer" or the windows as one short label, e.g. "Mo, Do 14:30–16:00". */
+function windowsLabel(windows: Room['windows']): string {
+  if (!windows?.length) return 'immer'
+  return windows.map((w) => `${windowDays(w)} ${w.start}–${w.end}`).join('; ')
+}
+
 export function RaeumePage() {
   const state = useBoard()
   const [modal, setModal] = useState(false)
@@ -21,6 +34,10 @@ export function RaeumePage() {
   const [roomEmoji, setRoomEmoji] = useState('🚪')
   const [roomCapacity, setRoomCapacity] = useState(4)
   const [roomScope, setRoomScope] = useState<Room['scope']>('all')
+  // the room whose weekly time windows are being edited (AGs offered only at
+  // certain times); the modal works on a local draft and commits on save
+  const [timesEdit, setTimesEdit] = useState<string | null>(null)
+  const [timesDraft, setTimesDraft] = useState<TimeWindow[]>([])
   // the room whose scope is being edited from the "Für" cell of the table:
   // the cell's element (the dropdown anchors under it) and the draft
   const [scopeEdit, setScopeEdit] = useState<{ id: string; anchor: HTMLElement } | null>(null)
@@ -40,7 +57,7 @@ export function RaeumePage() {
       <table>
         <thead>
           <tr>
-            <th>Raum</th><th>Kapazität</th><th>Belegt</th><th>Für</th><th>Status</th>
+            <th>Raum</th><th>Kapazität</th><th>Belegt</th><th>Für</th><th>Zeiten</th><th>Status</th>
             <th className="th-add">
               <button className="add" aria-label="Raum hinzufügen" onClick={() => setModal(true)}>
                 <Plus />
@@ -90,6 +107,18 @@ export function RaeumePage() {
                   }}
                 >
                   {scopeLabel(r.scope, state.klasses)} <ChevronDown className="icon-soft" size={16} />
+                </button>
+              </td>
+              <td>
+                <button
+                  className="scope-edit"
+                  title="Zeiten ändern"
+                  onClick={() => {
+                    setTimesEdit(r.id)
+                    setTimesDraft(r.windows?.map((w) => ({ ...w, days: [...w.days] })) ?? [])
+                  }}
+                >
+                  {windowsLabel(r.windows)} <Clock className="icon-soft" size={16} />
                 </button>
               </td>
               <td>
@@ -168,6 +197,83 @@ export function RaeumePage() {
           </button>
         </Modal>
       )}
+
+      {timesEdit &&
+        (() => {
+          const room = state.rooms.find((r) => r.id === timesEdit)
+          if (!room) return null
+          const patchWindow = (i: number, patch: Partial<TimeWindow>) =>
+            setTimesDraft(timesDraft.map((w, j) => (j === i ? { ...w, ...patch } : w)))
+          const toggleDay = (i: number, day: number) => {
+            const days = timesDraft[i].days.includes(day)
+              ? timesDraft[i].days.filter((d) => d !== day)
+              : [...timesDraft[i].days, day]
+            patchWindow(i, { days: days.sort((a, b) => a - b) })
+          }
+          return (
+            <Modal title={`Zeiten für ${room.name}`} onClose={() => setTimesEdit(null)}>
+              <p className="hint">
+                Ein Lernort mit Zeitfenstern ist nur an diesen Wochentagen und Uhrzeiten buchbar
+                (z. B. eine AG). Ohne Zeitfenster ist er immer verfügbar.
+              </p>
+              {timesDraft.map((w, i) => (
+                <div key={i} className="field window-row">
+                  <div className="day-toggles" role="group" aria-label="Wochentage">
+                    {DAY_NAMES.map((name, d) => (
+                      <button
+                        key={d}
+                        type="button"
+                        aria-pressed={w.days.includes(d + 1)}
+                        className={w.days.includes(d + 1) ? 'day on' : 'day'}
+                        onClick={() => toggleDay(i, d + 1)}
+                      >
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+                  <input
+                    type="time"
+                    aria-label="von"
+                    value={w.start}
+                    onChange={(e) => patchWindow(i, { start: e.target.value })}
+                  />
+                  <span>bis</span>
+                  <input
+                    type="time"
+                    aria-label="bis"
+                    value={w.end}
+                    onChange={(e) => patchWindow(i, { end: e.target.value })}
+                  />
+                  <button
+                    className="add danger"
+                    aria-label="Zeitfenster entfernen"
+                    onClick={() => setTimesDraft(timesDraft.filter((_, j) => j !== i))}
+                  >
+                    <Trash2 />
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                className="add"
+                onClick={() => setTimesDraft([...timesDraft, { days: [1], start: '13:00', end: '14:30' }])}
+              >
+                <Plus /> Zeitfenster hinzufügen
+              </button>
+              <div className="field">
+                <button
+                  disabled={timesDraft.some((w) => !w.days.length || !w.start || !w.end || w.start >= w.end)}
+                  onClick={() => {
+                    updateRoom(room.id, { windows: timesDraft })
+                    setTimesEdit(null)
+                  }}
+                >
+                  speichern
+                </button>
+              </div>
+            </Modal>
+          )
+        })()}
 
       {scopeEdit &&
         (() => {
