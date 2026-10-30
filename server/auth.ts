@@ -51,7 +51,7 @@ export function generatePin(): string {
 
 // --- signed tokens --------------------------------------------------------
 
-export type TokenKind = 'board' | 'teacher'
+export type TokenKind = 'board' | 'teacher' | 'dev'
 
 function sign(payload: string): string {
   return createHmac('sha256', SECRET).update(payload).digest('base64url')

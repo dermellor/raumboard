@@ -77,6 +77,10 @@ if (DEV && DEFAULT_TENANT && DEFAULT_TENANT !== DEMO_TENANT) {
 const ADMIN_TTL = 30 * 24 * 3600
 const BOARD_TTL = 180 * 24 * 3600
 const TEACHER_TTL = 12 * 3600
+/** How long an operator dev-open link works after it was minted. */
+const DEV_LINK_TTL = 10 * 60
+/** How long the dev session on the school's device lasts. */
+const DEV_TTL = 12 * 3600
 
 /**
  * What a request acts on. For a school that is its tenant slug; for the demo it
@@ -119,7 +123,8 @@ function authInfo(c: any, boardId: string) {
   const account = userId ? board.getActiveUser(db, userId) : undefined
   const hasBoard = verifyToken(getCookie(c, 'rb_board'), boardId, 'board', epoch)
   const hasTeacher = verifyToken(c.req.header('x-raumboard-teacher'), boardId, 'teacher', epoch)
-  return { isAdmin: !!account, hasBoard, hasTeacher, account }
+  const hasDev = verifyToken(getCookie(c, 'rb_dev'), boardId, 'dev', 0)
+  return { isAdmin: !!account, hasBoard, hasTeacher, hasDev, account }
 }
 
 function unlockEpoch(db: ReturnType<typeof openBoard>): number {
@@ -170,7 +175,7 @@ api.use('*', async (c, next) => {
 api.get('/state', (c) => {
   const boardId = c.get('boardId')
   const db = openBoard(boardId)
-  const { isAdmin, hasBoard, account } = authInfo(c, boardId)
+  const { isAdmin, hasBoard, account, hasDev } = authInfo(c, boardId)
   // Server-side `app_open`: the state fetch with an unlocked device is the
   // moment a board opens. Deduped per board pseudonym (analytics.ts), so the
   // polling/reconnects of one session count once.
@@ -191,6 +196,9 @@ api.get('/state', (c) => {
       // who is signed in, so the UI can greet them and show the owner-only tab
       account: hasBoard && account ? { email: account.email, role: account.role } : null,
       dev: DEV,
+      // opened through an operator dev link: the client skips its PIN and
+      // password gates (the server has its own, see the guards)
+      devOpen: hasDev,
       // throwaway demo board: nothing is stored, so the UI may offer a reset
       ephemeral: isDemoBoard(boardId),
       // published anyway, and prefilled so a visitor reaches the product directly
@@ -237,7 +245,40 @@ api.post('/logout', (c) => {
 api.post('/lock', (c) => {
   deleteCookie(c, 'rb_admin', { path: '/' })
   deleteCookie(c, 'rb_board', { path: '/' })
+  deleteCookie(c, 'rb_dev', { path: '/' })
   return c.json({ ok: true })
+})
+
+/**
+ * The exchange point for an operator dev link (minted by the operator API
+ * below): the short-lived signed token buys the three cookies of a fully
+ * unlocked session — device, owner account, and the dev marker. The dev
+ * marker makes the client skip its PIN/password gates and the server skip
+ * old-password checks; on its own it grants nothing, the other two cookies
+ * carry the real tokens. Locked again with the usual „Gerät sperren“.
+ */
+api.get('/dev-open', (c) => {
+  const boardId = c.get('boardId')
+  const token = c.req.query('token')
+  if (!verifyToken(token, boardId, 'dev', 0))
+    return c.text('Der Link ist abgelaufen. Bitte im Betreiber-Cockpit neu öffnen.', 401)
+  const db = openBoard(boardId)
+  const owner = board.listUsers(db).find((user) => user.role === 'owner' && user.active)
+  if (!owner) return c.text('Diese Instanz hat kein aktives Owner-Konto.', 401)
+  setCookie(c, 'rb_board', makeToken(boardId, 'board', unlockEpoch(db), BOARD_TTL), {
+    ...cookieOpts(),
+    maxAge: BOARD_TTL,
+  })
+  setCookie(c, 'rb_admin', makeAdminToken(boardId, owner.id, ADMIN_TTL), {
+    ...cookieOpts(),
+    maxAge: ADMIN_TTL,
+  })
+  setCookie(c, 'rb_dev', makeToken(boardId, 'dev', 0, DEV_TTL), {
+    ...cookieOpts(),
+    maxAge: DEV_TTL,
+  })
+  const next = c.req.query('next') ?? '/'
+  return c.redirect(next.startsWith('/') || next.startsWith('#') ? next : '/')
 })
 
 api.post('/pin', async (c) => {
@@ -276,10 +317,13 @@ api.post('/teacher/verify', deviceGuard, async (c) => {
   return c.json({ token: makeToken(boardId, 'teacher', unlockEpoch(db), TEACHER_TTL) })
 })
 
+// A valid dev cookie (set by the operator's dev-open link) stands in for the
+// in-memory teacher token everywhere the guards ask for it: a dev session
+// never confirms the PIN, so it has no teacher token to send.
 async function teacherGuard(c: any, next: () => Promise<void>) {
   const auth = authInfo(c, c.get('boardId'))
   if (!auth.hasBoard) return c.json({ error: 'locked' }, 401)
-  if (!auth.hasTeacher) return c.json({ error: 'teacher confirmation required' }, 403)
+  if (!auth.hasTeacher && !auth.hasDev) return c.json({ error: 'teacher confirmation required' }, 403)
   await next()
 }
 
@@ -296,7 +340,7 @@ for (const p of TEACHER_PATHS) api.use(p, teacherGuard)
 async function adminGuard(c: any, next: () => Promise<void>) {
   const auth = authInfo(c, c.get('boardId'))
   if (!auth.hasBoard) return c.json({ error: 'locked' }, 401)
-  if (!auth.hasTeacher) return c.json({ error: 'teacher confirmation required' }, 403)
+  if (!auth.hasTeacher && !auth.hasDev) return c.json({ error: 'teacher confirmation required' }, 403)
   if (!auth.isAdmin) return c.json({ error: 'admin required' }, 401)
   await next()
 }
@@ -310,7 +354,7 @@ for (const p of ['/verify-password', '/change-password', '/change-pin']) api.use
 async function ownerGuard(c: any, next: () => Promise<void>) {
   const auth = authInfo(c, c.get('boardId'))
   if (!auth.hasBoard) return c.json({ error: 'locked' }, 401)
-  if (!auth.hasTeacher) return c.json({ error: 'teacher confirmation required' }, 403)
+  if (!auth.hasTeacher && !auth.hasDev) return c.json({ error: 'teacher confirmation required' }, 403)
   if (auth.account?.role !== 'owner')
     return c.json({ error: 'owner required' }, 403)
   await next()
@@ -515,6 +559,9 @@ const THROTTLED = 'Zu viele Fehlversuche. Bitte in 15 Minuten erneut versuchen.'
 api.post('/verify-password', async (c) => {
   const boardId = c.get('boardId')
   if (throttled(boardId)) return c.json({ error: THROTTLED }, 429)
+  // A dev session (operator dev link) has no school password to type, so it
+  // never reaches this guess — and neither does the throttle.
+  if (authInfo(c, boardId).hasDev) return c.json({ ok: true })
   const { password } = await c.req.json<{ password?: string }>()
   const { account } = authInfo(c, boardId)
   const storedHash = account && board.getPassHash(openBoard(boardId), account.id)
@@ -531,13 +578,14 @@ api.post('/change-password', async (c) => {
   const db = openBoard(boardId)
   if (throttled(boardId)) return c.json({ error: THROTTLED }, 429)
   const { current, next } = await c.req.json<{ current?: string; next?: string }>()
-  const { account } = authInfo(c, boardId)
+  const auth = authInfo(c, boardId)
+  const { account } = auth
   const storedHash = account && board.getPassHash(db, account.id)
-  if (!current || !storedHash || !verifySecret(current, storedHash)) {
+  if (!auth.hasDev && (!current || !storedHash || !verifySecret(current, storedHash))) {
     noteFailure(boardId)
     return c.json({ error: 'Aktuelles Passwort falsch' }, 401)
   }
-  if (!next || next.length < 10)
+  if (!account || !next || next.length < 10)
     return c.json({ error: 'Neues Passwort braucht mindestens 10 Zeichen' }, 400)
   board.setUserPassword(db, account.id, hashSecret(next))
   failures.delete(boardId)
@@ -549,9 +597,10 @@ api.post('/change-pin', async (c) => {
   const db = openBoard(boardId)
   if (throttled(boardId)) return c.json({ error: THROTTLED }, 429)
   const { password, pin } = await c.req.json<{ password?: string; pin?: string }>()
-  const { account } = authInfo(c, boardId)
+  const auth = authInfo(c, boardId)
+  const { account } = auth
   const storedHash = account && board.getPassHash(db, account.id)
-  if (!password || !storedHash || !verifySecret(password, storedHash)) {
+  if (!auth.hasDev && (!password || !storedHash || !verifySecret(password, storedHash))) {
     noteFailure(boardId)
     return c.json({ error: 'Passwort falsch' }, 401)
   }
@@ -651,6 +700,17 @@ operatorApi.post('/logout', (c) => {
 })
 operatorApi.get('/overview', (c) => c.json(platformSnapshot()))
 operatorApi.get('/instances/:slug/logs', (c) => c.json({ log: backupLog(c.req.param('slug')) }))
+/** Mints a short-lived link that opens the school in dev mode (see /api/dev-open). */
+operatorApi.post('/instances/:slug/dev-link', (c) => {
+  const slug = c.req.param('slug')
+  if (!platformSnapshot().instances.some((instance) => instance.slug === slug))
+    return c.json({ error: 'Instanz nicht gefunden' }, 404)
+  const token = makeToken(slug, 'dev', 0, DEV_LINK_TTL)
+  const next = c.req.query('next') ?? ''
+  const url = `https://${slug}.${BASE_DOMAIN}/api/dev-open?token=${encodeURIComponent(token)}` +
+    (next ? `&next=${encodeURIComponent(next)}` : '')
+  return c.json({ url })
+})
 operatorApi.post('/instances/:slug/maintenance', async (c) => {
   const { enabled } = await c.req.json<{ enabled?: boolean }>()
   try {

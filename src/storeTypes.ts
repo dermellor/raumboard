@@ -17,6 +17,9 @@ export type StoreMeta = {
   account?: { email: string; role: Role } | null
   /** server runs in local dev mode (RAUMBOARD_DEV) — enables test-only affordances */
   dev: boolean
+  /** this session was opened with an operator dev link: PIN and password gates
+   * are skipped client-side, and the server skips old-password checks */
+  devOpen?: boolean
   /**
    * This board is the public demo: the server holds it in RAM for this visitor
    * only and stores nothing, so anyone may put it back to the seed data.

@@ -145,7 +145,7 @@ export function KinderPage() {
 
       <hr className="section-rule" />
       <button
-        onClick={() => (meta.mode === 'api' ? setGateOpen(true) : setImportOpen(true))}
+        onClick={() => (meta.mode === 'api' && !meta.devOpen ? setGateOpen(true) : setImportOpen(true))}
       >
         <FileUp /> Kinder aus Excel/CSV importieren
       </button>

@@ -51,16 +51,19 @@ export function Verwaltung({ page }: { page: VerwaltungPage }) {
   useEffect(() => () => clearTeacherAccess(), [])
 
   const confirmedHere = confirmed?.page === page ? confirmed.password : null
+  // A dev session (operator dev link) has neither PIN nor school password to
+  // type, so both gates stay out of the way and the password pages open freely.
+  const devOpen = meta.devOpen === true
   const needsPassword =
-    meta.mode === 'api' && PASSWORD_PAGES.includes(page) && confirmedHere === null
+    meta.mode === 'api' && PASSWORD_PAGES.includes(page) && confirmedHere === null && !devOpen
   const locked = (p: VerwaltungPage) =>
-    meta.mode === 'api' && PASSWORD_PAGES.includes(p) && confirmed?.page !== p
+    meta.mode === 'api' && PASSWORD_PAGES.includes(p) && confirmed?.page !== p && !devOpen
 
   // The teacher PIN is the key to the whole Verwaltung, and it is asked on
   // *every* entry: the device unlock lasts months, a class does not. Component
   // state, not a cookie — leaving the namespace locks it again. The password
   // pages ask for the school's password on top of it, the same way.
-  const gateOpen = meta.mode === 'api' && !meta.teacherConfirmed
+  const gateOpen = meta.mode === 'api' && !meta.teacherConfirmed && !devOpen
 
   return (
     <main className="admin">
