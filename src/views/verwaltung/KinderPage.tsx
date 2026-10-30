@@ -102,12 +102,12 @@ export function KinderPage() {
                   <tbody>
                     {kids.map((k) => (
                       <tr key={k.id}>
-                        <td>
+                        <td className="cell-name">
                           <EmojiButton
                             value={k.symbol}
                             label={`Symbol für ${k.name}`}
                             onChange={(symbol) => updateKid(k.id, { symbol })}
-                          />{' '}
+                          />
                           <NameField
                             value={k.name}
                             label={`Name von ${k.name}`}

@@ -1139,6 +1139,22 @@ h1 {
   max-width: 100%;
 }
 
+/* first column: icon and name stay on one line; when the column runs out
+   of room the name input gives way instead of wrapping under the icon */
+.admin td.cell-name {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.admin td.cell-name .emoji-btn {
+  flex: none;
+}
+.admin td.cell-name .inline-name {
+  width: 12rem;
+  min-width: 5rem;
+  flex: 1 1 auto;
+}
+
 /* --- scope dropdown (room table and room form) -------------------------------- */
 
 .field-scope {

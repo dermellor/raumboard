@@ -68,12 +68,12 @@ export function RaeumePage() {
         <tbody>
           {state.rooms.map((r) => (
             <tr key={r.id} className={r.isOpen ? undefined : 'closed'}>
-              <td>
+              <td className="cell-name">
                 <EmojiButton
                   value={r.emoji}
                   label={`Emoji für ${r.name}`}
                   onChange={(emoji) => updateRoom(r.id, { emoji })}
-                />{' '}
+                />
                 <NameField
                   value={r.name}
                   label={`Name von ${r.name}`}
