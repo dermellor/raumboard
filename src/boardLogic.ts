@@ -51,6 +51,13 @@ function covers(w: TimeWindow, now: NowPoint): boolean {
   return now.minutes >= from && now.minutes < to
 }
 
+/** True if any window lists the given weekday — the room is part of today's
+ *  program at all, even outside its hours. Rooms without windows always are. */
+export function offeredToday(room: Room, day: number): boolean {
+  if (!room.windows?.length) return true
+  return room.windows.some((w) => w.days.includes(day))
+}
+
 /** A room without windows is always available; otherwise one window must cover now. */
 export function isAvailableNow(room: Room, now: NowPoint): boolean {
   if (!room.windows?.length) return true

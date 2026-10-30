@@ -72,6 +72,25 @@ test('ein Zeitfenster begrenzt Wochentag und Uhrzeit', () => {
   assert.equal(logic.isAvailableNow(room, MO), false)
 })
 
+test('offeredToday zeigt nur Räume des heutigen Programms', () => {
+  const room = {
+    id: 'r',
+    name: 'R',
+    emoji: '🚪',
+    capacity: 4,
+    isOpen: true,
+    scope: 'all' as const,
+    windows: [DO_1430_1600],
+  }
+  // Raum ohne Fenster gehört immer zum Tagesprogramm
+  const always = { id: 'a', name: 'A', emoji: '🚪', capacity: 4, isOpen: true, scope: 'all' as const }
+  assert.equal(logic.offeredToday(always, 5), true)
+  assert.equal(logic.offeredToday(room, 4), true) // Donnerstag
+  assert.equal(logic.offeredToday(room, 5), false) // Freitag
+  // Auch außerhalb der Uhrzeiten gehört der Raum zum heutigen Programm
+  assert.equal(logic.offeredToday(room, DO_MIDDAY.day), true) // day 4
+})
+
 test('canBook begründet die Zeit dynamisch', () => {
   const room = {
     id: 'r',
