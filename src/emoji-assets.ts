@@ -316,6 +316,7 @@ export const OPENMOJI_HEX: string[] = [
   '2744',
   '2764',
   '2B50',
+  'E0DD',
 ]
 
 export type EmojiColor = { accent: string; tint: string }
@@ -578,6 +579,7 @@ export const EMOJI_COLORS: Record<string, EmojiColor> = {
   '2728': { accent: '#f3e016', tint: '#fbf8e0' },
   '2764': { accent: '#d22f27', tint: '#f9e2e1' },
   '2B50': { accent: '#f3e016', tint: '#fbf8e0' },
+  'E0DD': { accent: '#80502e', tint: '#f6ece5' },
 }
 
 // Ink-area normalization: 1 means "canvas average, leave alone", factors
@@ -894,4 +896,5 @@ export const EMOJI_SCALE: Record<string, number> = {
   '2744': 1.4,
   '2764': 1.252,
   '2B50': 1.322,
+  'E0DD': 1.4,
 }

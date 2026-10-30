@@ -5,6 +5,7 @@
 export const EMOJI_KEYWORDS: Record<string, string> = {
   '🦊': 'fuchs', '🐻': 'bär braunbär', '🐼': 'panda pandabär', '🐺': 'wolf',
   '🐗': 'wildschwein schwein', '🦌': 'hirsch reh', '🐿️': 'eichhörnchen',
+  '\uE0DD': 'erdmännchen meerkat suricata',
   '🦔': 'igel', '🦝': 'waschbär', '🦡': 'dachs', '🦫': 'biber', '🦦': 'otter',
   '🦇': 'fledermaus', '🐭': 'maus', '🐰': 'hase kaninchen', '🐱': 'katze',
   '🐈‍⬛': 'katze schwarze katze kater', '🐶': 'hund', '🐴': 'pferd',
@@ -118,6 +119,7 @@ export const EMOJI_CATEGORIES: { name: string; emojis: string[] }[] = [
     name: 'Tiere',
     emojis: [
       '🦊', '🐻', '🐼', '🐺', '🐗', '🦌', '🐿️', '🦔', '🦝', '🦡', '🦫', '🦦', '🦇',
+      '\uE0DD',
       '🐭', '🐰', '🐱', '🐈‍⬛', '🐶', '🐴',
       '🦁', '🐯', '🐘', '🦒', '🦓', '🦛', '🦏', '🐪', '🐒', '🦍', '🦥', '🐨', '🦘',
       '🐊', '🐍', '🦎',

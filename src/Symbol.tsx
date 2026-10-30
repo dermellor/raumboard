@@ -5,13 +5,23 @@ import { useMeta } from './useBoard'
 
 const OPENMOJI = new Set(OPENMOJI_HEX)
 
+// A symbol outside Unicode: the meerkat (Erdmännchen) is a common class
+// mascot, but no emoji codepoint exists. It lives on the private-use plane
+// U+E0DD and is rendered from its own SVG in BOTH modes — a private-use
+// character has no native glyph, so the text fallback would show tofu.
+const SVG_ONLY: Record<string, string> = {
+  E0DD: 'Erdmännchen', // keyed by hex name; value is the alt text
+}
+
 /**
  * A symbol on the boards. With OpenMoji (the default) an emoji is rendered as a
  * self-hosted SVG so every device draws the same picture and old emoji fonts
  * cannot show tofu; anything without an asset (stored data may hold any emoji)
  * falls back to the system emoji. When the school set „Geräte-Emojis" in the
- * Verwaltung, everything renders as text as before. `force` overrides the
- * school's setting, for previews of both options side by side.
+ * Verwaltung, everything renders as text as before, except the custom symbols
+ * (SVG_ONLY), which keep their SVG because they have no native counterpart.
+ * `force` overrides the school's setting, for previews of both options side by
+ * side.
  * `className` carries the sizing the way it always did: the SVG scales with the
  * font-size of its surroundings. `--sym-scale` carries the painted-area factor
  * from the manifest (see scripts/fetch-openmoji.mjs), so thin or flat designs
@@ -33,12 +43,13 @@ export function Symbol({
   const meta = useMeta()
   const mode = force ?? meta.symbols ?? 'openmoji'
   const hex = hexname(value)
-  if (mode !== 'native' && hex && OPENMOJI.has(hex))
+  const custom = SVG_ONLY[hex]
+  if ((mode !== 'native' || custom !== undefined) && hex && OPENMOJI.has(hex))
     return (
       <span className={['sym', className].filter(Boolean).join(' ')}>
         <img
           src={`/emoji/${hex}.svg`}
-          alt={value}
+          alt={custom ?? value}
           draggable={false}
           style={EMOJI_SCALE[hex] !== undefined ? { '--sym-scale': EMOJI_SCALE[hex] } as CSSProperties : undefined}
         />
