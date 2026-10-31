@@ -8,10 +8,10 @@ Mehrzeilige Namen und Platzpunkte lassen Karte und gemeinsame Grid-Zeile gemäß
 
 ## QA-Nacharbeit
 
-- [x] Breite Lernräume-Ansicht: `Snozzle/Leselandschaft` bei ausreichender Kartenbreite ausdrücklich einzeilig halten.
-- [x] Schmale Lernräume-Ansicht: optionalen Umbruch nach `/` sowie vollständige Namen und Platzpunkte beibehalten.
+- [x] Ausgangslage, bestehende Nacharbeits-Commits und verbindliches Mockup analysieren.
+- [x] Breite Lernräume-Ansicht: `Snozzle/Leselandschaft` bei ausreichender Kartenbreite tatsächlich einzeilig vermessen.
+- [x] Schmale Lernräume-Ansicht: optionalen Umbruch nach `/`, vollständige Platzpunkte und gleiche Grid-Höhen vermessen.
 - [x] Automatisierte Tests für unveränderte Namen mit und ohne `/` ausführen.
-- [x] Tests, Lint und Typecheck/Build ausführen.
-- [x] Browser-Layoutprüfung schmal wie breit in der veröffentlichten Vorschau wiederholen.
-- [x] Laufende Vorschau registrieren und Datenquelle in der Übergabe begründen.
+- [x] Lint und Typecheck/Build ausführen.
+- [x] Laufende Vorschau mit geleastem Port registrieren.
 - [x] Nacharbeit als Conventional Commit committen.
