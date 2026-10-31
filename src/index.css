@@ -356,7 +356,10 @@ button {
 .launcher .room-tile .seats {
   gap: 0.3rem;
   margin-top: 0.2rem;
-  max-width: 5.9rem;
+  /* eight dots of 0.58rem plus seven gaps of 0.3rem take 6.74rem, so 16
+     capacity dots (the reference card) run in two even rows of eight —
+     the accepted mockup's stated layout — instead of 7/7/2. */
+  max-width: 6.8rem;
 }
 
 .launcher .room-tile .seats i {
