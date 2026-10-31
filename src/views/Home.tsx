@@ -1,5 +1,6 @@
 import { LogIn, LogOut, Settings } from 'lucide-react'
 import { useState } from 'react'
+import { BreakableName } from '../BreakableName'
 import { Seats } from '../components'
 import { DayEndReset } from '../DayEndReset'
 import { PasswordGate } from '../PasswordGate'
@@ -47,7 +48,7 @@ export function Home() {
           <a key={r.id} href={`#/raum/${r.id}`}>
             <div className="tile room-tile" style={roomVars(r)}>
               <Symbol className="emoji" value={r.emoji} />
-              <span className="name">{r.name}</span>
+              <BreakableName name={r.name} />
               {r.isOpen ? (
                 <Seats capacity={r.capacity} occupied={occupancy(r.id, state)} />
               ) : (

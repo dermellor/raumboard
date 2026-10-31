@@ -194,7 +194,10 @@ button {
 }
 
 .room-tile .name {
+  max-width: 100%;
   color: var(--accent);
+  line-height: 1.2;
+  overflow-wrap: normal;
 }
 
 .room-tile:disabled {
@@ -320,6 +323,23 @@ button {
 .launcher .tile {
   width: 100%;
   height: 100%;
+}
+
+/* The home cards follow the accepted narrow-card layout: long names and seat
+   rows grow the card instead of painting across its rounded edge. */
+.launcher .room-tile {
+  overflow: hidden;
+}
+
+.launcher .room-tile .seats {
+  gap: 0.3rem;
+  margin-top: 0.2rem;
+  max-width: 5.9rem;
+}
+
+.launcher .room-tile .seats i {
+  width: 0.58rem;
+  height: 0.58rem;
 }
 
 .count {

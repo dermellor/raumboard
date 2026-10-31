@@ -73,7 +73,7 @@ function buildKids(): Kid[] {
 function buildRooms(): Room[] {
   const shared: Room[] = [
     { id: 'bibliothek', name: 'Bibliothek', emoji: '📚', capacity: 8, isOpen: true, scope: 'all' },
-    { id: 'atelier-blau', name: 'Lernatelier (blau)', emoji: '🔵', capacity: 12, isOpen: true, scope: 'all' },
+    { id: 'atelier-blau', name: 'Snozzle/Leselandschaft', emoji: '🛋️', capacity: 16, isOpen: true, scope: 'all' },
     { id: 'atelier-rot', name: 'Lernatelier (rot)', emoji: '🔴', capacity: 12, isOpen: true, scope: 'all' },
     { id: 'atelier-gruen', name: 'Lernatelier (grün)', emoji: '🟢', capacity: 12, isOpen: true, scope: 'all' },
     { id: 'foyer', name: 'Foyer', emoji: '🪑', capacity: 6, isOpen: true, scope: 'all' },
