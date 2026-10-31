@@ -315,9 +315,14 @@ button {
   gap: 0.75rem;
 }
 
-/* Desktop cards need enough inline space for the accepted one-line
-   Snozzle/Leselandschaft state. Narrow screens keep the denser grid below,
-   where the slash becomes the optional two-line boundary. */
+/* The centered flex item should use the full unbroken name when it fits.
+   max-inline-size still constrains it to the card, so <wbr> boundaries are
+   used on narrow cards instead of overflowing the rounded edge. */
+.launcher .room-tile .name {
+  inline-size: max-content;
+  max-inline-size: 100%;
+}
+
 @media (min-width: 60rem) {
   .launcher {
     grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));

@@ -8,10 +8,10 @@ Mehrzeilige Namen und Platzpunkte lassen Karte und gemeinsame Grid-Zeile gemäß
 
 ## QA-Nacharbeit
 
-- [x] Breite Lernräume-Ansicht: Karten so breit halten, dass `Snozzle/Leselandschaft` bei 1440 px einzeilig bleibt.
+- [x] Breite Lernräume-Ansicht: `Snozzle/Leselandschaft` bei ausreichender Kartenbreite ausdrücklich einzeilig halten.
 - [x] Schmale Lernräume-Ansicht: optionalen Umbruch nach `/` sowie vollständige Namen und Platzpunkte beibehalten.
-- [x] Mehrere, führende, folgende und benachbarte `/` automatisiert auf verlustfreie Umbruchstellen prüfen.
-- [x] Emoji-Assets unter dem konfigurierten Vite-Basispfad statt root-absolut laden.
-- [x] Gebauten Preview-Pfad sowie sichtbare Emoji-Ressourcen ohne 404 prüfen.
-- [x] Tests, Lint, Typecheck/Build und Browser-Layoutprüfung ausführen.
+- [x] Automatisierte Tests für unveränderte Namen mit und ohne `/` ausführen.
+- [x] Tests, Lint und Typecheck/Build ausführen.
+- [ ] Browser-Layoutprüfung schmal wie breit in der veröffentlichten Vorschau wiederholen.
+- [x] Laufende Vorschau registrieren und Datenquelle in der Übergabe begründen.
 - [x] Nacharbeit als Conventional Commit committen.
