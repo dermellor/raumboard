@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react'
 import { EMOJI_SCALE, OPENMOJI_HEX } from './emoji-assets'
 import { hexname } from './emoji-hex'
+import { emojiAssetUrl } from './emojiAsset'
 import { useMeta } from './useBoard'
 
 const OPENMOJI = new Set(OPENMOJI_HEX)
@@ -37,7 +38,7 @@ export function Symbol({
     return (
       <span className={['sym', className].filter(Boolean).join(' ')}>
         <img
-          src={`/emoji/${hex}.svg`}
+          src={emojiAssetUrl(import.meta.env.BASE_URL, hex)}
           alt={value}
           draggable={false}
           style={EMOJI_SCALE[hex] !== undefined ? { '--sym-scale': EMOJI_SCALE[hex] } as CSSProperties : undefined}

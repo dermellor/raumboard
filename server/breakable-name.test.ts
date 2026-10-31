@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { slashSegments } from '../src/breakableName'
+import { emojiAssetUrl } from '../src/emojiAsset'
 
 function renderedText(name: string): string {
   return slashSegments(name).join('')
@@ -33,4 +34,16 @@ test('leading, trailing and adjacent slashes preserve every character', () => {
     assert.equal(renderedText(name), name)
     assert.equal(slashSegments(name).filter((segment) => segment.endsWith('/')).length, (name.match(/\//g) ?? []).length)
   }
+})
+
+test('emoji assets stay below Vite base paths', () => {
+  assert.equal(emojiAssetUrl('/', '1F6CB'), '/emoji/1F6CB.svg')
+  assert.equal(
+    emojiAssetUrl('/previews/raumboard-4/', '1F6CB'),
+    '/previews/raumboard-4/emoji/1F6CB.svg',
+  )
+  assert.equal(
+    emojiAssetUrl('/previews/raumboard-4', '1F4DA'),
+    '/previews/raumboard-4/emoji/1F4DA.svg',
+  )
 })
