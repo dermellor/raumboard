@@ -327,6 +327,14 @@ button {
   .launcher {
     grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
   }
+
+  /* At the UI's capped root size, 1.05rem makes the accepted long room name
+     wider than the 286px card. Keep the mockup size on narrow cards, where
+     the slash should wrap, and reduce only wide launcher names enough that
+     the complete label fits inside the card's padded content box. */
+  .launcher .room-tile .name {
+    font-size: 0.875rem;
+  }
 }
 
 .launcher a {
