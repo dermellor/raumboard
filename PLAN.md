@@ -12,6 +12,6 @@ Mehrzeilige Namen und Platzpunkte lassen Karte und gemeinsame Grid-Zeile gemäß
 - [x] Schmale Lernräume-Ansicht: optionalen Umbruch nach `/` sowie vollständige Namen und Platzpunkte beibehalten.
 - [x] Automatisierte Tests für unveränderte Namen mit und ohne `/` ausführen.
 - [x] Tests, Lint und Typecheck/Build ausführen.
-- [ ] Browser-Layoutprüfung schmal wie breit in der veröffentlichten Vorschau wiederholen.
+- [x] Browser-Layoutprüfung schmal wie breit in der veröffentlichten Vorschau wiederholen.
 - [x] Laufende Vorschau registrieren und Datenquelle in der Übergabe begründen.
 - [x] Nacharbeit als Conventional Commit committen.
