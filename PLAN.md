@@ -21,6 +21,19 @@ Mehrzeilige Namen und Platzpunkte lassen Karte und gemeinsame Grid-Zeile gemäß
 - [x] QA-Runde 4 (erneut 502): Der Runner hatte die Dienste unter neuen PIDs (2818374 API, 2818456 Web) neu gestartet; der API-Port antwortete beim Smoke noch nicht. Erneut verifiziert: `/api/state` über die Preview-Adresse 200, Zustand liefert die Live-Daten (KGS St. Franziskus-Schule, 15 Räume, `Snozzle/Leselandschaft`), `.cockpit-services.json` auf die neuen PIDs gestellt.
 - [x] Nacharbeit als Conventional Commit committet; `DATEN:`-Zeile in der Zusammenfassung.
 
+## QA-Nacharbeit (Runde 4 → 5)
+
+- [x] QA-Runde-4-Befund analysiert: „kein Backend registriert" — die Runner-Neustarts der Dienste hatten die PIDs in `.cockpit-services.json` erneut veralten lassen; die Läufe der Dienste selbst (API 3656, Web 3660) sind als Runner-units (`cockpit-svc-raumboard-4-api/web`) aktiv und antworten 200.
+- [x] PIDs in `.cockpit-services.json` auf die laufenden Dienste synchronisiert (API 2820254, Web 2820346); Runner-Proxy für `/previews/raumboard-4/` nimmt die Registrierung am Laufende vor.
+- [x] Headless-Chromium-Verifikation gegen die Live-Daten (KGS St. Franziskus-Schule, 15 Räume, echte Daten):
+  - 375 px: 15 Karten, Name einzeilig innerhalb der Karte, kein Überlauf, Platzpunkte in der Karte.
+  - 1440 px: Name einzeilig innerhalb der Karte, kein Überlauf.
+  - Zu schmale Karte (90 px erzwungen): Umbruch nach dem `/` — Zeile 1 endet mit `Snozzle/`, Zeile 2 beginnt mit `Leselandschaft`; der `/` bleibt am Ende der ersten Zeile sichtbar.
+  - Kopie per Selection: exakt `Snozzle/Leselandschaft`, ohne Leerzeichen; `aria-label` identisch; genau 1 `<wbr>` hinter dem Schrägstrich.
+  - Keine Karten-Überlappung, alle Grid-Zeilen mit gemeinsamer Höhe.
+- [x] `npm test` (59 Pass), `npm run lint`, `npm run build` grün.
+- [x] Nacharbeit als Conventional Commit committit; `DATEN:`-Zeile in der Zusammenfassung.
+
 ## Offen (für Marcel / Review)
 
 - [ ] Finale visuelle Abnahme durch Marcel.
