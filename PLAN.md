@@ -48,7 +48,17 @@ Mehrzeilige Namen und Platzpunkte lassen Karte und gemeinsame Grid-Zeile gemäß
 - [x] `npm test` (59/59), `npm run lint`, `npm run build` grün.
 - [x] Nacharbeit als Conventional Commit committet; `DATEN:`-Zeile in der Zusammenfassung.
 
+## QA-Nacharbeit (Runde 7 → 8)
+
+- [x] QA-Runde-7-Befund analysiert („Vorschau läuft nicht / kein Backend registriert“). Runter bis zur Wurzelursache geführt — nicht die PIDs waren veraltet, sondern der Runner-Gesundheitscheck selbst mordete den API-Dienst jede Reconcile-Runde (~60 s): `healDeclaredServices` prüft den Port-Owner-Prozess auf Fremd-CWD mit `cwd.startsWith(<worktree> + "/")`; der Dienst lief mit `cwd == <worktree>` (exakt, systemd-Unit setzt WorkingDirectory ohne Schrägstrich) → eigener Prozess galt als Hijacker → SIGTERM/SIGKILL + Neustart, jede Minute (journal bestätigt: Stop/Start-Zyklus alle ~55 s). In diesen Fenstern sah die QA 502/Ausfallseiten (Runden 3–8).
+- [x] Fix ohne Änderung am Runner: Startkommando des API-Dienstes in `.cockpit-services.json` auf `cd server && env … npx tsx watch index.ts` geändert, so dass der Port-Owner mit CWD `<worktree>/server` läuft und die Hijacker-Prüfung passt; den überflüssigen Web-Dev-Dienst (3660) aus der Registrierung entfernt (die veröffentlichte Vorschau nutzt nur preview-static + API-Port 3656).
+- [x] Wirksamkeit verifiziert: Runner hat den Dienst mit dem neuen Kommando übernommen (12:59:24), danach 4+ Minuten über mehrere Reconcile-Runden ohne einen einzigen Neustart; API 3656 und Preview-API antworten durchgehend 200.
+- [x] Fehlende Preview-Registrierung der Vorruunde behoben: Vorschau über `POST /preview/register` (xu49v0) neu registriert; Map-Eintrag stabil, Root/Deep-Link/API über den Proxy grün.
+- [x] Funktionsverifikation über den Preview-Proxy wie im QA-Browser: PIN-Unlock (`0000`) → `/api/state` liefert Live-Daten (KGS St. Franziskus-Schule, 15 Räume inkl. `Snozzle/Leselandschaft`).
+- [x] `npm test` (59/59), `npm run lint`, `npm run build` grün.
+
 ## Offen (für Marcel / Review)
 
 - [ ] Finale visuelle Abnahme durch Marcel.
 - [ ] Hinweis zur Abweichung: Das Mockup rendert die 16 Platzpunkte mit seinen eigenen Maßen (root 16 px) tatsächlich als 7+7+2; seine Note und der QA-Befund verlangen zwei Zeilen. Umgesetzt sind zwei Zeilen (8+8) gemäß Note/QA; dokumentiert in Commit und Zusammenfassung.
+- [ ] Runner-seitiger Hinweis (nicht Teil dieses Issues): Der CWD-Hijack-Check in `healDeclaredServices` (`cwd.startsWith(worktree + "/")`) sollte `cwd === worktree || …` akzeptieren — jeder deklarierte Dienst, der im Worktree-Root läuft, wird sonst minütlich gekillt. Wurde hier worktree-seitig umgangen (CWD `server/`), eine Behebung im product-cockpit-Repo empfohlen.
