@@ -41,6 +41,13 @@ Mehrzeilige Namen und Platzpunkte lassen Karte und gemeinsame Grid-Zeile gemäß
 - [x] `npm test` (59/59), `npm run lint`, `npm run build` grün.
 - [x] Nacharbeit committet; `DATEN:`-Zeile in der Zusammenfassung.
 
+## QA-Nacharbeit (Runde 6 → 7)
+
+- [x] QA-Runde-6-Befund analysiert: erneut 502 auf `/previews/raumboard-4/api/state` — der Runner hatte API (3656) und Web (3660) am 12:29 unter neuen PIDs neu gestartet; die Einträge in `.cockpit-services.json` waren erneut veraltet, der Liveness-Check meldete die Dienste tot → Proxy 502.
+- [x] PIDs auf die laufenden Prozesse synchronisiert (API 113703, Web 113763) und verifiziert: 3656, 3660, Preview-Root und `/previews/raumboard-4/api/state` antworten alle 200; State liefert die Live-Daten (KGS St. Franziskus-Schule, API-Mode).
+- [x] `npm test` (59/59), `npm run lint`, `npm run build` grün.
+- [x] Nacharbeit als Conventional Commit committet; `DATEN:`-Zeile in der Zusammenfassung.
+
 ## Offen (für Marcel / Review)
 
 - [ ] Finale visuelle Abnahme durch Marcel.
