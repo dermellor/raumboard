@@ -17,6 +17,7 @@ Mehrzeilige Namen und Platzpunkte lassen Karte und gemeinsame Grid-Zeile gemäß
 - [x] Umbruch-Fähigkeit des Namens bei zu schmaler Karte bestätigt (320 px: `Snozzle/` / `Leselandschaft`).
 - [x] `npm test` (59 Pass), `npm run lint`, `npm run build` grün.
 - [x] Dienste mit geleasten Ports 3656 (API) und 3660 (Web) in `.cockpit-services.json` registriert.
+- [x] QA-Runde 3 (502 auf `/previews/raumboard-4/api/state`): Ursache waren veraltete PIDs in `.cockpit-services.json` (Runner-Neustart der Dienste) — Liveness-Check meldete den Dienst tot, der Proxy antwortete 502. PIDs auf die laufenden Prozesse (API 3656, Web 3660) korrigiert; beide Ports antworten wieder 200 (direkt und über den Vite-Proxy).
 - [x] Nacharbeit als Conventional Commit committet; `DATEN:`-Zeile in der Zusammenfassung.
 
 ## Offen (für Marcel / Review)
