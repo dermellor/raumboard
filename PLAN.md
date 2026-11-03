@@ -62,3 +62,9 @@ Mehrzeilige Namen und Platzpunkte lassen Karte und gemeinsame Grid-Zeile gemäß
 - [ ] Finale visuelle Abnahme durch Marcel.
 - [ ] Hinweis zur Abweichung: Das Mockup rendert die 16 Platzpunkte mit seinen eigenen Maßen (root 16 px) tatsächlich als 7+7+2; seine Note und der QA-Befund verlangen zwei Zeilen. Umgesetzt sind zwei Zeilen (8+8) gemäß Note/QA; dokumentiert in Commit und Zusammenfassung.
 - [ ] Runner-seitiger Hinweis (nicht Teil dieses Issues): Der CWD-Hijack-Check in `healDeclaredServices` (`cwd.startsWith(worktree + "/")`) sollte `cwd === worktree || …` akzeptieren — jeder deklarierte Dienst, der im Worktree-Root läuft, wird sonst minütlich gekillt. Wurde hier worktree-seitig umgangen (CWD `server/`), eine Behebung im product-cockpit-Repo empfohlen.
+
+## Merge-Konflikt-Auflösung (origin/main-Sync)
+
+- [x] Offenen Konflikt in `src/Symbol.tsx` semantisch gelöst: beide Seiten kombiniert — base-bewusste Asset-URL aus dem Branch (`emojiAssetUrl(import.meta.env.BASE_URL, hex)`) + Custom-Alt-Text (`custom ?? value`) für das Erdmännchen-Symbol aus origin/main.
+- [x] Merge-Commit erstellt (0a8f53a), danach `npm test` 70/70, `npm run lint`, `npm run build` grün.
+- [x] Vorschau verifiziert: API 3656 und Preview-Proxy `/previews/raumboard-4/` sowie `/api/state` antworten 200; E0DD.svg ist im Build vorhanden.
