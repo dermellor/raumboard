@@ -136,6 +136,13 @@ Consequences worth knowing before touching this:
   key `symbols`, `POST /api/symbols`, device plus Verwaltung grant). The change is
   broadcast over the WebSocket, so every whiteboard switches without a reload;
   symbols without a downloaded asset always fall back to the system emoji.
+  Exception: the meerkat (`U+E0DD`, file `public/emoji/E0DD.svg`) is a custom
+  symbol without a Unicode emoji — no codepoint exists for Erdmännchen, but it
+  is a common class mascot. It renders from its SVG in both modes (a
+  private-use char has no native glyph), is listed in the Tiere category of
+  `src/emojis.ts` and searchable as „erdmännchen". The fetch script keeps it
+  in the manifest (its on-disk scan), and colors/scale are derived like for
+  every OpenMoji file.
 - **The confirmed password is handed to the credential forms**, so „Passwort
   ändern" asks for the new password only and „Lehrkraft-PIN ändern" for the new
   PIN. The server still requires the current password in the body; the gate has

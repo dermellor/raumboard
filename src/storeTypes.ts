@@ -1,4 +1,4 @@
-import type { Account, BoardState, BookResult, Kid, Klass, Role, Room } from './types'
+import type { Account, BoardState, BookResult, Kid, Klass, Role, Room, TimeWindow } from './types'
 
 export type StoreMeta = {
   mode: 'demo' | 'api'
@@ -17,6 +17,9 @@ export type StoreMeta = {
   account?: { email: string; role: Role } | null
   /** server runs in local dev mode (RAUMBOARD_DEV) — enables test-only affordances */
   dev: boolean
+  /** this session was opened with an operator dev link: PIN and password gates
+   * are skipped client-side, and the server skips old-password checks */
+  devOpen?: boolean
   /**
    * This board is the public demo: the server holds it in RAM for this visitor
    * only and stores nothing, so anyone may put it back to the seed data.
@@ -66,7 +69,13 @@ export type BoardStore = {
   /** demo mode only */
   reseed(): void
 
-  addRoom(name: string, emoji: string, capacity: number, scope: Room['scope']): void
+  addRoom(
+    name: string,
+    emoji: string,
+    capacity: number,
+    scope: Room['scope'],
+    windows?: TimeWindow[],
+  ): void
   updateRoom(roomId: string, patch: Partial<Omit<Room, 'id'>>): void
   removeRoom(roomId: string): void
   addKid(klassId: string, symbol: string, name: string): void

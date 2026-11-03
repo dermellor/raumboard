@@ -1,7 +1,10 @@
 import type Database from 'better-sqlite3'
 import { randomBytes } from 'node:crypto'
-import { canBook } from '../src/boardLogic'
+import { canBook, normalizeWindows } from '../src/boardLogic'
+import { nowPoint } from '../src/nowPoint'
 import type { Account, BoardState, BookResult, Kid, Klass, Role, Room } from '../src/types'
+
+export { normalizeWindows } from '../src/boardLogic'
 
 // Server-side board operations. The rules live in src/boardLogic.ts (shared
 // with the frontend stores) — this module loads state from SQLite, applies
@@ -23,7 +26,7 @@ export function loadState(db: Database.Database): BoardState {
     }),
   )
   const rooms = (
-    db.prepare('SELECT id, name, emoji, capacity, is_open, scope FROM rooms').all() as any[]
+    db.prepare('SELECT id, name, emoji, capacity, is_open, scope, windows FROM rooms').all() as any[]
   ).map(
     (r): Room => ({
       id: r.id,
@@ -32,6 +35,7 @@ export function loadState(db: Database.Database): BoardState {
       capacity: r.capacity,
       isOpen: !!r.is_open,
       scope: scopeFromDb(r.scope),
+      windows: windowsFromDb(r.windows),
     }),
   )
   return { klasses, kids, rooms }
@@ -179,6 +183,19 @@ export function normalizeScope(value: unknown): Room['scope'] {
   return 'all'
 }
 
+// --- time windows -----------------------------------------------------------
+
+// Same tolerance as the scope: stored JSON that no longer parses reads as
+// "always available", so a corrupt value can never hide a room.
+export function windowsFromDb(raw: string | null | undefined): Room['windows'] {
+  if (!raw) return undefined
+  return normalizeWindows(JSON.parse(raw)) // throws on garbage → migration/seed bug
+}
+
+export function windowsToDb(windows: Room['windows']): string | null {
+  return windows?.length ? JSON.stringify(windows) : null
+}
+
 // --- booking ---------------------------------------------------------------
 
 export function book(db: Database.Database, kidId: string, roomId: string): BookResult {
@@ -187,7 +204,7 @@ export function book(db: Database.Database, kidId: string, roomId: string): Book
     const kid = state.kids.find((k) => k.id === kidId)
     const room = state.rooms.find((r) => r.id === roomId)
     if (!kid || !room) return { ok: false, reason: 'Kind oder Raum nicht gefunden' }
-    const check = canBook(kid, room, state)
+    const check = canBook(kid, room, state, nowPoint())
     if (!check.ok) return check
     db.prepare('UPDATE kids SET current_room_id = ? WHERE id = ?').run(roomId, kidId)
     return { ok: true }
@@ -229,14 +246,11 @@ export function addRoom(
   emoji: string,
   capacity: number,
   scope: Room['scope'],
+  windows?: Room['windows'],
 ): void {
-  db.prepare('INSERT INTO rooms (id, name, emoji, capacity, is_open, scope) VALUES (?, ?, ?, ?, 1, ?)').run(
-    slugId(db, name),
-    name,
-    emoji,
-    Math.max(0, capacity),
-    scopeToDb(scope),
-  )
+  db.prepare(
+    'INSERT INTO rooms (id, name, emoji, capacity, is_open, scope, windows) VALUES (?, ?, ?, ?, 1, ?, ?)',
+  ).run(slugId(db, name), name, emoji, Math.max(0, capacity), scopeToDb(scope), windowsToDb(windows))
 }
 
 export function updateRoom(db: Database.Database, roomId: string, patch: Partial<Room>): void {
@@ -246,6 +260,7 @@ export function updateRoom(db: Database.Database, roomId: string, patch: Partial
   if (patch.capacity !== undefined) fields.capacity = Math.max(0, patch.capacity)
   if (patch.isOpen !== undefined) fields.is_open = patch.isOpen ? 1 : 0
   if (patch.scope !== undefined) fields.scope = scopeToDb(normalizeScope(patch.scope))
+  if (patch.windows !== undefined) fields.windows = windowsToDb(patch.windows)
   const keys = Object.keys(fields)
   if (!keys.length) return
   const sets = keys.map((k) => `${k} = ?`).join(', ')
@@ -408,10 +423,10 @@ export function replaceAll(db: Database.Database, state: BoardState): void {
       'INSERT INTO kids (id, klass_id, symbol, name, current_room_id) VALUES (?, ?, ?, ?, ?)',
     )
     const insRoom = db.prepare(
-      'INSERT INTO rooms (id, name, emoji, capacity, is_open, scope) VALUES (?, ?, ?, ?, ?, ?)',
+      'INSERT INTO rooms (id, name, emoji, capacity, is_open, scope, windows) VALUES (?, ?, ?, ?, ?, ?, ?)',
     )
     for (const c of state.klasses) insKlass.run(c.id, c.name, c.emoji ?? null)
     for (const k of state.kids) insKid.run(k.id, k.klassId, k.symbol, k.name, k.currentRoomId)
-    for (const r of state.rooms) insRoom.run(r.id, r.name, r.emoji, r.capacity, r.isOpen ? 1 : 0, scopeToDb(r.scope))
+    for (const r of state.rooms) insRoom.run(r.id, r.name, r.emoji, r.capacity, r.isOpen ? 1 : 0, scopeToDb(r.scope), windowsToDb(r.windows))
   })()
 }

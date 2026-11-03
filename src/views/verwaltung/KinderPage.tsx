@@ -102,12 +102,12 @@ export function KinderPage() {
                   <tbody>
                     {kids.map((k) => (
                       <tr key={k.id}>
-                        <td>
+                        <td className="cell-name">
                           <EmojiButton
                             value={k.symbol}
                             label={`Symbol für ${k.name}`}
                             onChange={(symbol) => updateKid(k.id, { symbol })}
-                          />{' '}
+                          />
                           <NameField
                             value={k.name}
                             label={`Name von ${k.name}`}
@@ -145,7 +145,7 @@ export function KinderPage() {
 
       <hr className="section-rule" />
       <button
-        onClick={() => (meta.mode === 'api' ? setGateOpen(true) : setImportOpen(true))}
+        onClick={() => (meta.mode === 'api' && !meta.devOpen ? setGateOpen(true) : setImportOpen(true))}
       >
         <FileUp /> Kinder aus Excel/CSV importieren
       </button>
@@ -214,6 +214,7 @@ export function KinderPage() {
             />
           </div>
           <button
+            className="primary"
             disabled={!editName.trim() || editName.trim() === editKlass.name && editEmoji === (editKlass.emoji ?? '')}
             onClick={() => {
               updateKlass(editKlass.id, { name: editName.trim(), emoji: editEmoji })
