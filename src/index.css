@@ -194,7 +194,10 @@ button {
 }
 
 .room-tile .name {
+  max-width: 100%;
   color: var(--accent);
+  line-height: 1.2;
+  overflow-wrap: normal;
 }
 
 .room-tile:disabled {
@@ -312,6 +315,28 @@ button {
   gap: 0.75rem;
 }
 
+/* The centered flex item should use the full unbroken name when it fits.
+   max-inline-size still constrains it to the card, so <wbr> boundaries are
+   used on narrow cards instead of overflowing the rounded edge. */
+.launcher .room-tile .name {
+  inline-size: max-content;
+  max-inline-size: 100%;
+}
+
+@media (min-width: 60rem) {
+  .launcher {
+    grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+  }
+
+  /* At the UI's capped root size, 1.05rem makes the accepted long room name
+     wider than the 286px card. Keep the mockup size on narrow cards, where
+     the slash should wrap, and reduce only wide launcher names enough that
+     the complete label fits inside the card's padded content box. */
+  .launcher .room-tile .name {
+    font-size: 0.875rem;
+  }
+}
+
 .launcher a {
   text-decoration: none;
   color: var(--ink);
@@ -320,6 +345,26 @@ button {
 .launcher .tile {
   width: 100%;
   height: 100%;
+}
+
+/* The home cards follow the accepted narrow-card layout: long names and seat
+   rows grow the card instead of painting across its rounded edge. */
+.launcher .room-tile {
+  overflow: hidden;
+}
+
+.launcher .room-tile .seats {
+  gap: 0.3rem;
+  margin-top: 0.2rem;
+  /* eight dots of 0.58rem plus seven gaps of 0.3rem take 6.74rem, so 16
+     capacity dots (the reference card) run in two even rows of eight —
+     the accepted mockup's stated layout — instead of 7/7/2. */
+  max-width: 6.8rem;
+}
+
+.launcher .room-tile .seats i {
+  width: 0.58rem;
+  height: 0.58rem;
 }
 
 .count {
