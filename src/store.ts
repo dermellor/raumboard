@@ -46,6 +46,7 @@ export const {
   changePassword,
   changePin,
   setSymbols,
+  setRoomsHeading,
   lockDevice,
   listAccounts,
   createAccount,

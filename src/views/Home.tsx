@@ -44,7 +44,7 @@ export function Home() {
         })}
       </div>
 
-      <h2>Lernräume</h2>
+      <h2>{meta.roomsHeading || 'Lernorte'}</h2>
       <div className="launcher">
         {state.rooms
           // Same rule as the picker: rooms that are not part of today's program

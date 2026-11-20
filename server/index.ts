@@ -210,6 +210,9 @@ api.get('/state', (c) => {
       symbols: hasBoard
         ? board.getConfig(db, 'symbols') === 'native' ? 'native' : 'openmoji'
         : undefined,
+      // The heading over the room tiles on the start page. A school may
+      // rename it for its children; nothing set means the default „Lernorte“.
+      roomsHeading: hasBoard ? board.getConfig(db, 'rooms_heading') || null : undefined,
     },
   })
 })
@@ -328,7 +331,7 @@ async function teacherGuard(c: any, next: () => Promise<void>) {
 }
 
 const TEACHER_PATHS = [
-  '/symbols', '/rooms', '/rooms/*', '/kids', '/kids/*', '/klasses', '/klasses/*',
+  '/symbols', '/rooms-heading', '/rooms', '/rooms/*', '/kids', '/kids/*', '/klasses', '/klasses/*',
 ]
 for (const p of TEACHER_PATHS) api.use(p, teacherGuard)
 
@@ -427,6 +430,21 @@ api.post('/symbols', async (c) => {
     return c.json({ error: 'symbols muss "openmoji" oder "native" sein' }, 400)
   board.setConfig(openBoard(boardId), 'symbols', symbols)
   broadcast(boardId, { type: 'symbols', symbols })
+  return c.json({ ok: true })
+})
+
+/**
+ * The heading over the room tiles on the start page, school-wide like the
+ * symbols setting: a school may rename it for its children („Ich bin hier“,
+ * say). Empty restores the default „Lernorte“. Broadcast so every board
+ * switches without a reload.
+ */
+api.post('/rooms-heading', async (c) => {
+  const boardId = c.get('boardId')
+  const { heading } = await c.req.json<{ heading?: string }>()
+  const value = typeof heading === 'string' ? heading.trim().slice(0, 60) : ''
+  board.setConfig(openBoard(boardId), 'rooms_heading', value)
+  broadcast(boardId, { type: 'rooms-heading', heading: value || null })
   return c.json({ ok: true })
 })
 

@@ -351,19 +351,31 @@ export function importKids(
       .map((e) => ({ ...e, klassName: (e.klass || targetKlass || '').trim() }))
       .filter((e) => e.name.trim() && e.klassName)
 
+    // In replace mode a kid that comes back through the same name in the same
+    // class keeps its symbol: a re-import must not flatten hand-assigned symbols
+    // (the Franziskus instance ended up with the fallback star for every kid
+    // because a second import assigned fresh ones over the existing).
+    const keptSymbols = new Map<string, string>()
     if (mode === 'replace') {
       const targetIds = new Set(prepared.map((e) => resolveKlass(e.klassName)))
-      for (const id of targetIds) db.prepare('DELETE FROM kids WHERE klass_id = ?').run(id)
+      for (const id of targetIds) {
+        for (const kid of db
+          .prepare('SELECT name, symbol FROM kids WHERE klass_id = ?')
+          .all(id) as { name: string; symbol: string }[])
+          keptSymbols.set(`${id}|${kid.name.trim()}`, kid.symbol)
+        db.prepare('DELETE FROM kids WHERE klass_id = ?').run(id)
+      }
     }
 
     let added = 0
     for (const e of prepared) {
       const klassId = resolveKlass(e.klassName)
+      const name = e.name.trim()
       db.prepare('INSERT INTO kids (id, klass_id, symbol, name) VALUES (?, ?, ?, ?)').run(
-        slugId(db, `${klassId}-${e.name.trim()}`),
+        slugId(db, `${klassId}-${name}`),
         klassId,
-        e.symbol || '⭐',
-        e.name.trim(),
+        keptSymbols.get(`${klassId}|${name}`) ?? (e.symbol || '⭐'),
+        name,
       )
       added++
     }

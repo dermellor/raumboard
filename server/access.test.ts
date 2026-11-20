@@ -162,6 +162,37 @@ test('the device PIN reveals state and a separate confirmation opens the Verwalt
   assert.equal((await call('DELETE', `/klasses/${klassId}`, { cookies, teacher })).status, 200)
 })
 
+test('the start-page heading is a school-wide config on the teacher level', async () => {
+  const { rb_board, teacher } = await teacherSession()
+  const cookies = { rb_board }
+
+  const metaOf = async () =>
+    (await (await call('GET', '/state', { cookies })).json()) as {
+      meta: { roomsHeading?: string | null }
+    }
+
+  // nothing set: the boards fall back to the default „Lernorte“
+  assert.equal((await metaOf()).meta.roomsHeading, null)
+
+  const withoutConfirmation = await call('POST', '/rooms-heading', {
+    cookies,
+    body: { heading: 'Ich bin hier' },
+  })
+  assert.equal(withoutConfirmation.status, 403)
+
+  const saved = await call('POST', '/rooms-heading', {
+    cookies,
+    teacher,
+    body: { heading: '  Ich bin hier  ' },
+  })
+  assert.equal(saved.status, 200)
+  assert.equal((await metaOf()).meta.roomsHeading, 'Ich bin hier')
+
+  const cleared = await call('POST', '/rooms-heading', { cookies, teacher, body: { heading: '   ' } })
+  assert.equal(cleared.status, 200)
+  assert.equal((await metaOf()).meta.roomsHeading, null)
+})
+
 test('the import needs device, Verwaltung confirmation and account together', async () => {
   const { rb_board, teacher } = await teacherSession()
   const kids = [{ name: 'Import I.', symbol: '🐝', klass: '1A' }]

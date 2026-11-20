@@ -195,8 +195,14 @@ export const demoStore: BoardStore = {
       .map((e) => ({ ...e, klassName: (e.klass || targetKlass || '').trim() }))
       .filter((e) => e.name.trim() && e.klassName)
 
+    // Same rule as the server import: in replace mode a kid returning under
+    // the same name keeps its current symbol.
+    const keptSymbols = new Map<string, string>()
     if (mode === 'replace') {
       const targetIds = new Set(prepared.map((e) => resolveKlass(e.klassName)))
+      for (const k of kids) {
+        if (targetIds.has(k.klassId)) keptSymbols.set(`${k.klassId}|${k.name}`, k.symbol)
+      }
       kids = kids.filter((k) => !targetIds.has(k.klassId))
     }
 
@@ -207,7 +213,13 @@ export const demoStore: BoardStore = {
       let id = slug(`${klassId}-${e.name.trim()}`)
       let n = 2
       while (taken.has(id)) id = `${slug(`${klassId}-${e.name.trim()}`)}-${n++}`
-      kids.push({ id, klassId, symbol: e.symbol || '⭐', name: e.name.trim(), currentRoomId: null })
+      kids.push({
+        id,
+        klassId,
+        symbol: keptSymbols.get(`${klassId}|${e.name.trim()}`) ?? (e.symbol || '⭐'),
+        name: e.name.trim(),
+        currentRoomId: null,
+      })
       added++
     }
 
@@ -243,6 +255,10 @@ export const demoStore: BoardStore = {
 
   async setSymbols() {
     // the settings section is api-mode only; nothing to change in the demo
+    return { ok: false as const, reason: 'Im Demo-Modus nicht verfügbar' }
+  },
+  async setRoomsHeading() {
+    // same as the symbols setting above
     return { ok: false as const, reason: 'Im Demo-Modus nicht verfügbar' }
   },
   async lockDevice() {},
