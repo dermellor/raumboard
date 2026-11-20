@@ -26,10 +26,16 @@ export type StoreMeta = {
    */
   ephemeral: boolean
   /**
-   * The demo's published login and PIN, so its forms can prefill themselves.
+   * The demo's published owner/admin logins and PIN, so its forms can prefill
+   * the owner login while automated and manual QA can exercise both roles.
    * Null on a school's board.
    */
-  demoCredentials?: { email: string; password: string; pin: string } | null
+  demoCredentials?: {
+    email: string
+    adminEmail: string
+    password: string
+    pin: string
+  } | null
   /** digit count of the teacher PIN (api mode), for the segmented gate display */
   pinLength?: number | null
   /**

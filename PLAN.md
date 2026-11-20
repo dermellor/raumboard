@@ -11,15 +11,17 @@ Die Oberfläche zeigt die Löschaktion ausschließlich bei angemeldetem Konto.
 - [x] Löschaktion anhand des aktiven Kontos ein- oder ausblenden
 - [x] Zugriffstests für PIN-only, admin und owner sowie UI-Sichtbarkeit ergänzen
 - [x] Rücksetzen eingebuchter Kinder beim Löschen absichern
+- [x] Vorschau mit reproduzierbaren Owner- und Admin-Zugängen ausstatten
+- [x] Demo- und Zugriffstests für beide Rollen und Kind-Rücksetzung ergänzen
 - [x] Tests, Lint und Build ausführen
 - [x] Laufende Vorschau registrieren und Kernpfade prüfen
 - [x] Änderungen committen
 
 ## Verifikation
 
-- ✅ `node --import tsx --test server/access.test.ts server/room-permissions.test.ts` – 13 Tests bestanden
-- ✅ `npm test` – 73 Tests bestanden
+- ✅ `node --import tsx --test server/demo.test.ts server/access.test.ts server/room-permissions.test.ts` – 23 gezielte Zugriffs-, Demo- und UI-Berechtigungstests bestanden
+- ✅ `npm test` – 74 Tests bestanden
 - ✅ `npm run lint` – ohne Befund
-- ✅ `npm run build` – TypeScript-Projektbuild und Vite-Build erfolgreich
-- ✅ `curl -sS -o /dev/null -w 'direct=%{http_code}\\n' -H 'Host: dev.raumboard.de' http://127.0.0.1:3659/api/state && curl -sS -o /dev/null -w 'proxy=%{http_code}\\n' http://127.0.0.1:3661/api/state` – API direkt und über den Vorschau-Proxy mit HTTP 200 erreichbar
-- ❌ `node --import tsx --test server/access.test.ts server/room-permissions.test.ts` – initial wegen fehlender lokaler Abhängigkeiten abgebrochen; mit `npm ci` behoben
+- ✅ `npm run build` – TypeScript-Projektbuild und Vite-Produktionsbuild erfolgreich
+- ✅ `curl` gegen `/api/pin`, `/api/login`, `/api/teacher/verify`, `/api/book`, `DELETE /api/rooms/bibliothek` und `/api/state` – Admin-Löschung erfolgreich; eingebuchtes Kind anschließend mit `currentRoomId: null`
+- ✅ `curl` gegen `/api/logout`, `/api/login` und `/api/state` – separates Owner-Konto erfolgreich als Rolle `owner` angemeldet
