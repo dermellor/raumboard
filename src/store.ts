@@ -1,6 +1,7 @@
 import { apiStore } from './apiStore'
 import { demoStore } from './demoStore'
 import type { BoardStore } from './storeTypes'
+import { shouldUseApiStore } from './runtimeMode'
 
 export { canBook, freeSlots, occupancy } from './boardLogic'
 export type { AuthResult, StoreMeta } from './storeTypes'
@@ -12,9 +13,14 @@ declare global {
   }
 }
 
-// The switch: served by the Raumboard server (or dev proxy mode) → api store,
-// otherwise (static prototype/demo) → localStorage store.
-const useApi = Boolean(window.__RAUMBOARD__) || import.meta.env.VITE_API === 'true'
+// The switch: served by the Raumboard server, the dev proxy or a Cockpit
+// preview (which proxies /api to the running backend) → api store, otherwise
+// (static prototype/demo) → localStorage store.
+const useApi = shouldUseApiStore(
+  Boolean(window.__RAUMBOARD__),
+  import.meta.env.VITE_API,
+  window.location.pathname,
+)
 
 export const store: BoardStore = useApi ? apiStore : demoStore
 

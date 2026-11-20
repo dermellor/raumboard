@@ -24,12 +24,16 @@ export type TimeWindow = {
   end: string
 }
 
+export type RoomBoardVisibility = 'always' | 'open-only'
+
 export type Room = {
   id: string
   name: string
   emoji: string
   capacity: number
   isOpen: boolean
+  /** Whether a closed room remains visible on child-facing boards (default: always). */
+  boardVisibility?: RoomBoardVisibility
   // which classes may book here: every class ('all', also future ones) or a
   // list of klassIds (e.g. the two classes sharing one cluster's hallway desks)
   scope: 'all' | string[]

@@ -474,8 +474,10 @@ api.post('/admin/import', async (c) => {
 
 /** Verwaltung CRUD — teacher level (see BOARD_PATHS). */
 api.post('/rooms', async (c) => {
-  const { name, emoji, capacity, scope, windows } = await c.req.json()
+  const { name, emoji, capacity, scope, windows, boardVisibility } = await c.req.json()
   if (!name?.trim()) return c.json({ error: 'name fehlt' }, 400)
+  if (boardVisibility !== undefined && boardVisibility !== 'always' && boardVisibility !== 'open-only')
+    return c.json({ error: 'boardVisibility ungültig' }, 400)
   board.addRoom(
     openBoard(c.get('boardId')),
     name.trim(),
@@ -483,13 +485,17 @@ api.post('/rooms', async (c) => {
     Number(capacity) || 0,
     board.normalizeScope(scope),
     board.normalizeWindows(windows),
+    boardVisibility,
   )
   broadcast(c.get('boardId'), stateMessage(c.get('boardId')))
   return c.json({ ok: true })
 })
 
 api.patch('/rooms/:id', async (c) => {
-  board.updateRoom(openBoard(c.get('boardId')), c.req.param('id'), await c.req.json())
+  const patch = await c.req.json()
+  if (patch.boardVisibility !== undefined && patch.boardVisibility !== 'always' && patch.boardVisibility !== 'open-only')
+    return c.json({ error: 'boardVisibility ungültig' }, 400)
+  board.updateRoom(openBoard(c.get('boardId')), c.req.param('id'), patch)
   broadcast(c.get('boardId'), stateMessage(c.get('boardId')))
   return c.json({ ok: true })
 })

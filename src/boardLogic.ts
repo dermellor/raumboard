@@ -58,6 +58,11 @@ export function offeredToday(room: Room, day: number): boolean {
   return room.windows.some((w) => w.days.includes(day))
 }
 
+/** Shared child-board rule. Admin and direct room views deliberately do not use it. */
+export function visibleOnKidsBoards(room: Room): boolean {
+  return room.isOpen || room.boardVisibility !== 'open-only'
+}
+
 /** A room without windows is always available; otherwise one window must cover now. */
 export function isAvailableNow(room: Room, now: NowPoint): boolean {
   if (!room.windows?.length) return true

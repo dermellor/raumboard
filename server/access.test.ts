@@ -146,6 +146,23 @@ test('the device PIN reveals state and a separate confirmation opens the Verwalt
   assert.equal(created.status, 200)
   const room = board.loadState(db).rooms.find((r) => r.name === 'Leseecke')!
   assert.ok(room)
+  assert.equal(room.boardVisibility, 'always')
+
+  const visibility = await call('PATCH', `/rooms/${room.id}`, {
+    cookies,
+    teacher,
+    body: { boardVisibility: 'open-only' },
+  })
+  assert.equal(visibility.status, 200)
+  assert.equal(board.loadState(db).rooms.find((r) => r.id === room.id)!.boardVisibility, 'open-only')
+
+  const invalidVisibility = await call('PATCH', `/rooms/${room.id}`, {
+    cookies,
+    teacher,
+    body: { boardVisibility: 'sometimes' },
+  })
+  assert.equal(invalidVisibility.status, 400)
+  assert.equal(board.loadState(db).rooms.find((r) => r.id === room.id)!.boardVisibility, 'open-only')
 
   const closed = await call('PATCH', `/rooms/${room.id}`, { cookies, teacher, body: { isOpen: false } })
   assert.equal(closed.status, 200)
