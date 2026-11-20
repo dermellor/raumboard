@@ -17,7 +17,16 @@ Die Oberfläche zeigt die Löschaktion ausschließlich bei angemeldetem Konto.
 - [x] Lösch-Journey mit PIN-Bestätigung und Kind-Rücksetzung erneut prüfen
 - [x] Tests, Lint und Build ausführen
 - [x] Laufende Vorschau registrieren und Kernpfade prüfen
+- [x] Merge `origin/main` semantisch auflösen (roomsHeading-Stand + Löschschutz in `server/access.test.ts` vereint, Commit df0fccb)
 - [x] Änderungen committen
+
+## Verifikation (nach Merge-Sync)
+
+- ✅ `npx tsx --test server/access.test.ts` – 12 Tests bestanden (kombinierte Version mit roomsHeading- und Löschschutz-Tests)
+- ✅ `npm test` – 90 Tests bestanden
+- ✅ `npm run lint` – ohne Befund
+- ✅ `npm run build -- --base=/previews/raumboard-5/` – Build erfolgreich
+- ✅ `curl` gegen Preview-API – PIN-only-Löschung 401 („admin required“), Admin-Löschung 200
 
 ## Verifikation
 
