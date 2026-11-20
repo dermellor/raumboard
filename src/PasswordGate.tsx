@@ -23,7 +23,8 @@ export function PasswordGate({
   onClose: () => void
 }) {
   const meta = useMeta()
-  // the demo hands its own credentials over, so nobody has to copy them in
+  // Demo visitors can explicitly choose both published roles. This keeps the
+  // permission boundary visible and makes owner/admin QA reproducible.
   const demo = meta.demoCredentials
   const signIn = !meta.isAdmin
   const [email, setEmail] = useState(demo?.email ?? '')
@@ -45,6 +46,19 @@ export function PasswordGate({
 
   return (
     <Modal title={signIn ? 'Anmelden' : 'Passwort bestätigen'} onClose={onClose}>
+      {signIn && demo && (
+        <div className="field">
+          <label htmlFor="gate-demo-account">Demo-Konto</label>
+          <select
+            id="gate-demo-account"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          >
+            <option value={demo.email}>Owner · {demo.email}</option>
+            <option value={demo.adminEmail}>Admin · {demo.adminEmail}</option>
+          </select>
+        </div>
+      )}
       {signIn && (
         <div className="field">
           <label htmlFor="gate-email">E-Mail</label>

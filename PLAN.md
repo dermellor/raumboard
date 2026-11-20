@@ -11,17 +11,19 @@ Die Oberfläche zeigt die Löschaktion ausschließlich bei angemeldetem Konto.
 - [x] Löschaktion anhand des aktiven Kontos ein- oder ausblenden
 - [x] Zugriffstests für PIN-only, admin und owner sowie UI-Sichtbarkeit ergänzen
 - [x] Rücksetzen eingebuchter Kinder beim Löschen absichern
-- [x] Vorschau mit reproduzierbaren Owner- und Admin-Zugängen ausstatten
-- [x] Demo- und Zugriffstests für beide Rollen und Kind-Rücksetzung ergänzen
+- [x] Statischen Cockpit-Preview-Build zuverlässig mit dem API-Store verbinden
+- [x] Owner- und Admin-Anmeldung in der Demo-Oberfläche eindeutig auswählbar machen
+- [x] Browser-unabhängige Tests für Preview-Modus und beide Demo-Rollen ergänzen
+- [x] Lösch-Journey mit PIN-Bestätigung und Kind-Rücksetzung erneut prüfen
 - [x] Tests, Lint und Build ausführen
 - [x] Laufende Vorschau registrieren und Kernpfade prüfen
 - [x] Änderungen committen
 
 ## Verifikation
 
-- ✅ `node --import tsx --test server/demo.test.ts server/access.test.ts server/room-permissions.test.ts` – 23 gezielte Zugriffs-, Demo- und UI-Berechtigungstests bestanden
-- ✅ `npm test` – 74 Tests bestanden
+- ✅ `node --import tsx --test server/runtime-mode.test.ts server/demo.test.ts server/access.test.ts server/room-permissions.test.ts` – 26 gezielte Preview-, Zugriffs-, Demo- und UI-Berechtigungstests bestanden
+- ✅ `npm test` – 77 Tests bestanden
 - ✅ `npm run lint` – ohne Befund
-- ✅ `npm run build` – TypeScript-Projektbuild und Vite-Produktionsbuild erfolgreich
-- ✅ `curl` gegen `/api/pin`, `/api/login`, `/api/teacher/verify`, `/api/book`, `DELETE /api/rooms/bibliothek` und `/api/state` – Admin-Löschung erfolgreich; eingebuchtes Kind anschließend mit `currentRoomId: null`
+- ✅ `npm run build -- --base=/previews/raumboard-5/` – TypeScript-Projektbuild und Vite-Produktionsbuild unter dem Preview-Basispfad erfolgreich
+- ✅ `curl` gegen `/api/state`, `/api/pin`, `/api/login`, `/api/teacher/verify`, `/api/book` und `DELETE /api/rooms/bibliothek` – PIN-only mit 401 abgewiesen; Admin-Löschung erfolgreich; eingebuchtes Kind anschließend mit `currentRoomId: null`
 - ✅ `curl` gegen `/api/logout`, `/api/login` und `/api/state` – separates Owner-Konto erfolgreich als Rolle `owner` angemeldet
