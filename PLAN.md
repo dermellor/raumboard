@@ -23,6 +23,9 @@ Verwaltung, direkte Raumansichten, Buchungen und unabhängige Zeitfilter bleiben
 
 - [x] QA-Nacharbeit 3: Medialab in der Preview-DB hatte noch die Seed-Id `foyer` → Id auf `medialab` gerichtet; `#/raum/medialab` findet den Raum jetzt im State
 - [x] Test ergänzt: geschlossene open-only-Räume bleiben im State erreichbar (direkte Raumansicht)
+- [x] QA-Nacharbeit 4 (Schritt 5): mutierende Umschaltung `boardVisibility` end-to-end über die laufende Vorschau-API verifiziert — PIN-Freischaltung + Verwaltungs-Token, Mutation medialab `open-only`→`always` ändert den State sofort, ungültiger Wert → 400, ohne Verwaltungs-Token → 403, Rück-Mutation auf `open-only` restauriert den Ausgangszustand (Vorschau wieder konsistent)
+
+Hinweis für QA: Die browserseitige Umschaltung in der Verwaltung ist dasselbe `PATCH /api/rooms/:id`; sie bleibt als Sichtprüfung dem QA-Lauf mit Browser vorbehalten.
 
 ## Verifikation
 
@@ -32,3 +35,6 @@ Verwaltung, direkte Raumansichten, Buchungen und unabhängige Zeitfilter bleiben
 - `npm run build` – Build erfolgreich; Bundle enthält die `/previews/`-Erkennung des API-Modus
 - `curl http://127.0.0.1:3666/api/state` – Live-Kopie (KGS St. Franziskus-Schule), `deviceUnlocked: false`, `pinLength: 6`, kein Dev-Open-Bypass; falsche PIN und `reseed` werden mit 401 abgewiesen
 - Preview-Daten – geschlossener `open-only`-Raum (Medialab) und geschlossener `always`-Raum (Rezeption) vorhanden; 6 Kinder mit echten Ortsangaben eingebucht
+- `curl PATCH /api/rooms/medialab` (Vorschau-API, PIN 1234) – Mutation `always`↔`open-only` sofort im State sichtbar; `sometimes` → 400; ohne `X-Raumboard-Teacher` → 403; nach Rück-Mutation wieder `medialab:open-only, garten:always`
+- `npm test` – 78/78 bestanden (Re-Lauf QA-Nacharbeit 4)
+- `npm run lint` / `npm run build` – ohne Befund (Re-Lauf QA-Nacharbeit 4)
