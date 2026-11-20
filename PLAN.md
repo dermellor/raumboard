@@ -17,6 +17,9 @@ Verwaltung, direkte Raumansichten, Buchungen und unabhängige Zeitfilter bleiben
 - [x] Tests, Lint und Build erneut ausführen
 - [x] App mit Live-Daten starten, registrieren und Endpunkte prüfen
 - [x] Nacharbeit committen
+- [x] Nacharbeit committen
+- [x] QA-Nacharbeit 2: bekannte Lehrer-PIN nur auf der Vorschaukopie setzen (`scripts/set-preview-pin.ts`, PIN 1234) und in der Testanleitung dokumentieren
+- [x] PIN-Freischaltung und Verwaltung-Token über die echte Vorschau-API verifizieren (200 auf /api/pin und /api/teacher/verify)
 
 ## Verifikation
 
