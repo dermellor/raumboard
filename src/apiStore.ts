@@ -206,8 +206,8 @@ export const apiStore: BoardStore = {
     mutate('/api/reseed')
   },
 
-  addRoom(name, emoji, capacity, scope, windows) {
-    mutate('/api/rooms', { name, emoji, capacity, scope, windows }, true)
+  addRoom(name, emoji, capacity, scope, windows, boardVisibility) {
+    mutate('/api/rooms', { name, emoji, capacity, scope, windows, boardVisibility }, true)
   },
   updateRoom(roomId, patch) {
     void request('PATCH', `/api/rooms/${encodeURIComponent(roomId)}`, patch, true)

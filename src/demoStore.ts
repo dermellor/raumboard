@@ -17,14 +17,24 @@ const META: StoreMeta = {
 let state: BoardState = load()
 const listeners = new Set<() => void>()
 
+function withRoomDefaults(board: BoardState): BoardState {
+  return {
+    ...board,
+    rooms: board.rooms.map((room) => ({
+      ...room,
+      boardVisibility: room.boardVisibility ?? 'always',
+    })),
+  }
+}
+
 function load(): BoardState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) return JSON.parse(raw) as BoardState
+    if (raw) return withRoomDefaults(JSON.parse(raw) as BoardState)
   } catch {
     // corrupt storage → fall through to seed
   }
-  return buildSeed()
+  return withRoomDefaults(buildSeed())
 }
 
 function commit(next: BoardState) {
@@ -94,8 +104,10 @@ export const demoStore: BoardStore = {
     commit(buildSeed())
   },
 
-  addRoom(name, emoji, capacity, scope, windows) {
-    const room: Room = { id: slug(name), name, emoji, capacity, isOpen: true, scope, windows }
+  addRoom(name, emoji, capacity, scope, windows, boardVisibility = 'always') {
+    const room: Room = {
+      id: slug(name), name, emoji, capacity, isOpen: true, boardVisibility, scope, windows,
+    }
     commit({ ...state, rooms: [...state.rooms, room] })
   },
 

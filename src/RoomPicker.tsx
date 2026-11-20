@@ -3,7 +3,7 @@ import { firstName } from './displayName'
 import { homeVars, roomVars } from './roomColor'
 import { Symbol } from './Symbol'
 import { book, unbook } from './store'
-import { canBook, offeredToday, occupancy } from './boardLogic'
+import { canBook, offeredToday, occupancy, visibleOnKidsBoards } from './boardLogic'
 import { nowPoint } from './nowPoint'
 import { useBoard } from './useBoard'
 import type { Kid } from './types'
@@ -45,6 +45,7 @@ export function RoomPicker({ kid, onClose }: { kid: Kid; onClose: () => void }) 
             // Kids only see rooms that are part of today's program; an AG that
             // runs on another weekday stays invisible instead of greyed out.
             .filter((r) => offeredToday(r, now.day))
+            .filter(visibleOnKidsBoards)
             .map((room) => {
               const check = canBook(kid, room, state, now)
               const here = kid.currentRoomId === room.id

@@ -75,6 +75,7 @@ export type BoardStore = {
     capacity: number,
     scope: Room['scope'],
     windows?: TimeWindow[],
+    boardVisibility?: Room['boardVisibility'],
   ): void
   updateRoom(roomId: string, patch: Partial<Omit<Room, 'id'>>): void
   removeRoom(roomId: string): void

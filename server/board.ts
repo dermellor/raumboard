@@ -26,7 +26,7 @@ export function loadState(db: Database.Database): BoardState {
     }),
   )
   const rooms = (
-    db.prepare('SELECT id, name, emoji, capacity, is_open, scope, windows FROM rooms').all() as any[]
+    db.prepare('SELECT id, name, emoji, capacity, is_open, board_visibility, scope, windows FROM rooms').all() as any[]
   ).map(
     (r): Room => ({
       id: r.id,
@@ -34,6 +34,7 @@ export function loadState(db: Database.Database): BoardState {
       emoji: r.emoji,
       capacity: r.capacity,
       isOpen: !!r.is_open,
+      boardVisibility: r.board_visibility === 'open-only' ? 'open-only' : 'always',
       scope: scopeFromDb(r.scope),
       windows: windowsFromDb(r.windows),
     }),
@@ -247,10 +248,19 @@ export function addRoom(
   capacity: number,
   scope: Room['scope'],
   windows?: Room['windows'],
+  boardVisibility: Room['boardVisibility'] = 'always',
 ): void {
   db.prepare(
-    'INSERT INTO rooms (id, name, emoji, capacity, is_open, scope, windows) VALUES (?, ?, ?, ?, 1, ?, ?)',
-  ).run(slugId(db, name), name, emoji, Math.max(0, capacity), scopeToDb(scope), windowsToDb(windows))
+    'INSERT INTO rooms (id, name, emoji, capacity, is_open, board_visibility, scope, windows) VALUES (?, ?, ?, ?, 1, ?, ?, ?)',
+  ).run(
+    slugId(db, name),
+    name,
+    emoji,
+    Math.max(0, capacity),
+    boardVisibility === 'open-only' ? 'open-only' : 'always',
+    scopeToDb(scope),
+    windowsToDb(windows),
+  )
 }
 
 export function updateRoom(db: Database.Database, roomId: string, patch: Partial<Room>): void {
@@ -259,6 +269,8 @@ export function updateRoom(db: Database.Database, roomId: string, patch: Partial
   if (patch.emoji !== undefined) fields.emoji = patch.emoji
   if (patch.capacity !== undefined) fields.capacity = Math.max(0, patch.capacity)
   if (patch.isOpen !== undefined) fields.is_open = patch.isOpen ? 1 : 0
+  if (patch.boardVisibility !== undefined)
+    fields.board_visibility = patch.boardVisibility === 'open-only' ? 'open-only' : 'always'
   if (patch.scope !== undefined) fields.scope = scopeToDb(normalizeScope(patch.scope))
   if (patch.windows !== undefined) fields.windows = windowsToDb(patch.windows)
   const keys = Object.keys(fields)
@@ -423,10 +435,20 @@ export function replaceAll(db: Database.Database, state: BoardState): void {
       'INSERT INTO kids (id, klass_id, symbol, name, current_room_id) VALUES (?, ?, ?, ?, ?)',
     )
     const insRoom = db.prepare(
-      'INSERT INTO rooms (id, name, emoji, capacity, is_open, scope, windows) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO rooms (id, name, emoji, capacity, is_open, board_visibility, scope, windows) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
     )
     for (const c of state.klasses) insKlass.run(c.id, c.name, c.emoji ?? null)
     for (const k of state.kids) insKid.run(k.id, k.klassId, k.symbol, k.name, k.currentRoomId)
-    for (const r of state.rooms) insRoom.run(r.id, r.name, r.emoji, r.capacity, r.isOpen ? 1 : 0, scopeToDb(r.scope), windowsToDb(r.windows))
+    for (const r of state.rooms)
+      insRoom.run(
+        r.id,
+        r.name,
+        r.emoji,
+        r.capacity,
+        r.isOpen ? 1 : 0,
+        r.boardVisibility === 'open-only' ? 'open-only' : 'always',
+        scopeToDb(r.scope),
+        windowsToDb(r.windows),
+      )
   })()
 }
