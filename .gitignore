@@ -44,3 +44,4 @@ scripts/deploy-bunny.py
 .env.*
 !.env.example
 .cockpit-services.json
+.preview-data/
