@@ -11,6 +11,7 @@ Verwaltung, direkte Raumansichten, Buchungen und unabhängige Zeitfilter bleiben
 - [x] Auswahlfeld in der bestehenden Raumverwaltung ergänzen
 - [x] Gemeinsame Sichtbarkeitslogik für Startseite und Raumauswahl extrahieren
 - [x] API-, Persistenz- und UI-/Logiktests für Standardwert und beide Varianten ergänzen
+- [x] QA-Nacharbeit: statische Cockpit-Vorschau in den API-Modus schalten (runtimeMode, `/previews/`-Pfad)
 - [x] QA-Nacharbeit: PIN-Abfrage in der Abnahmevorschau sicherstellen
 - [x] QA-Nacharbeit: Vorschau aus einer aktuellen Produktivdaten-Kopie statt Seed-Daten betreiben
 - [x] Tests, Lint und Build erneut ausführen
@@ -19,9 +20,9 @@ Verwaltung, direkte Raumansichten, Buchungen und unabhängige Zeitfilter bleiben
 
 ## Verifikation
 
-- `node --import tsx --test server/verwaltung-access.test.ts` – 2/2 bestanden
-- `npm test` – 75/75 bestanden
+- `node --import tsx --test server/runtime-mode.test.ts server/verwaltung-access.test.ts server/room-visibility.test.ts` – Preview-Modus-, PIN- und Sichtbarkeitsprüfungen bestanden
+- `npm test` – 78/78 bestanden
 - `npm run lint` – ohne Befund
-- `npm run build` – TypeScript-Projektbuild und Vite-Produktionsbuild erfolgreich
-- `curl http://127.0.0.1:3673/` und `curl http://127.0.0.1:3673/api/state` – App-Shell erreichbar; Live-Instanz gesperrt, PIN-Gate-Metadaten vorhanden, kein Dev-Open-Bypass
-- Live-Datenbankkopie – Integritätsprüfung erfolgreich, sechs Migrationen angewendet, ein geschlossener Raum als `open-only` für die Abnahme vorbereitet
+- `npm run build` – Build erfolgreich; Bundle enthält die `/previews/`-Erkennung des API-Modus
+- `curl http://127.0.0.1:3666/api/state` – Live-Kopie (KGS St. Franziskus-Schule), `deviceUnlocked: false`, `pinLength: 6`, kein Dev-Open-Bypass; falsche PIN und `reseed` werden mit 401 abgewiesen
+- Preview-Daten – geschlossener `open-only`-Raum (Medialab) und geschlossener `always`-Raum (Rezeption) vorhanden; 6 Kinder mit echten Ortsangaben eingebucht
