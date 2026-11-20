@@ -134,12 +134,16 @@ function fromFullName(full: string): { first: string; init: string } {
 
 /**
  * Turn parsed rows into ready-to-import kids: shortens surnames to an initial,
- * assigns emojis avoiding collisions with `usedSymbols`.
+ * assigns emojis avoiding collisions with `usedSymbols`. In replace mode the
+ * wizard passes `keep`: a kid that already exists under the same name in the
+ * same class keeps its current symbol, so a re-import cannot flatten
+ * hand-assigned symbols (the server enforces the same rule).
  */
 export function prepareKids(
   table: ParsedTable,
   map: Mapping,
   usedSymbols: Set<string>,
+  keep?: { symbols: Map<string, string>; defaultKlass: string | null },
 ): PreparedKid[] {
   const used = new Set(usedSymbols)
   const cell = (row: string[], field: FieldKey) => {
@@ -161,13 +165,15 @@ export function prepareKids(
     }
     if (!name) issues.push('kein Name')
 
-    let symbol = cell(row, 'symbol')
+    const klassName = map.klass !== undefined ? cell(row, 'klass') || null : null
+    const kept = keep?.symbols.get(
+      `${(klassName ?? keep.defaultKlass ?? '').toLowerCase()}|${name}`,
+    )
+    let symbol = kept || cell(row, 'symbol')
     if (!symbol) {
       symbol = nextEmoji()
       used.add(symbol)
     }
-
-    const klassName = map.klass !== undefined ? cell(row, 'klass') || null : null
 
     return { rowIndex, name, symbol, klassName, issues }
   })

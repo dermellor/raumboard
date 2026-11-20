@@ -149,6 +149,23 @@ test('the device PIN reveals state and a separate confirmation opens the Verwalt
   assert.equal(created.status, 200)
   const room = board.loadState(db).rooms.find((r) => r.name === 'Leseecke')!
   assert.ok(room)
+  assert.equal(room.boardVisibility, 'always')
+
+  const visibility = await call('PATCH', `/rooms/${room.id}`, {
+    cookies,
+    teacher,
+    body: { boardVisibility: 'open-only' },
+  })
+  assert.equal(visibility.status, 200)
+  assert.equal(board.loadState(db).rooms.find((r) => r.id === room.id)!.boardVisibility, 'open-only')
+
+  const invalidVisibility = await call('PATCH', `/rooms/${room.id}`, {
+    cookies,
+    teacher,
+    body: { boardVisibility: 'sometimes' },
+  })
+  assert.equal(invalidVisibility.status, 400)
+  assert.equal(board.loadState(db).rooms.find((r) => r.id === room.id)!.boardVisibility, 'open-only')
 
   const closed = await call('PATCH', `/rooms/${room.id}`, { cookies, teacher, body: { isOpen: false } })
   assert.equal(closed.status, 200)
@@ -192,6 +209,37 @@ test('active admin and owner accounts may delete rooms after PIN confirmation', 
     assert.equal(next.rooms.some((candidate) => candidate.id === room.id), false)
     assert.equal(next.kids.find((candidate) => candidate.id === kid.id)?.currentRoomId, null)
   }
+})
+
+test('the start-page heading is a school-wide config on the teacher level', async () => {
+  const { rb_board, teacher } = await teacherSession()
+  const cookies = { rb_board }
+
+  const metaOf = async () =>
+    (await (await call('GET', '/state', { cookies })).json()) as {
+      meta: { roomsHeading?: string | null }
+    }
+
+  // nothing set: the boards fall back to the default „Lernorte“
+  assert.equal((await metaOf()).meta.roomsHeading, null)
+
+  const withoutConfirmation = await call('POST', '/rooms-heading', {
+    cookies,
+    body: { heading: 'Ich bin hier' },
+  })
+  assert.equal(withoutConfirmation.status, 403)
+
+  const saved = await call('POST', '/rooms-heading', {
+    cookies,
+    teacher,
+    body: { heading: '  Ich bin hier  ' },
+  })
+  assert.equal(saved.status, 200)
+  assert.equal((await metaOf()).meta.roomsHeading, 'Ich bin hier')
+
+  const cleared = await call('POST', '/rooms-heading', { cookies, teacher, body: { heading: '   ' } })
+  assert.equal(cleared.status, 200)
+  assert.equal((await metaOf()).meta.roomsHeading, null)
 })
 
 test('the import needs device, Verwaltung confirmation and account together', async () => {

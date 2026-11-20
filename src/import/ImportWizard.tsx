@@ -26,13 +26,38 @@ export function ImportWizard({ onClose }: { onClose: () => void }) {
   const [done, setDone] = useState<{ added: number; klassesCreated: string[] } | null>(null)
 
   const usedSymbols = useMemo(() => new Set(state.kids.map((k) => k.symbol)), [state.kids])
-  const prepared = useMemo(
-    () => (table ? prepareKids(table, mapping, usedSymbols) : []),
-    [table, mapping, usedSymbols],
-  )
-  const validCount = prepared.filter((p) => p.issues.length === 0).length
   const hasKlassColumn = mapping.klass !== undefined
   const effectiveTarget = newKlass.trim() || targetKlass || null
+
+  // Replace empties the affected classes first; a kid returning under the same
+  // name keeps its current symbol, and the preview shows exactly that (the
+  // server enforces the same rule whatever the client sends).
+  const keep = useMemo(() => {
+    if (mode !== 'replace' || !table) return undefined
+    const targets = new Set(
+      hasKlassColumn
+        ? table.rows
+            .map((r) =>
+              mapping.klass !== undefined ? (r[mapping.klass] ?? '').trim().toLowerCase() : '',
+            )
+            .filter(Boolean)
+        : [effectiveTarget?.toLowerCase() ?? ''],
+    )
+    if (targets.size === 0 || targets.has('')) return undefined
+    const klassById = new Map(state.klasses.map((c) => [c.id, c.name.trim().toLowerCase()]))
+    const symbols = new Map<string, string>()
+    for (const kid of state.kids) {
+      const klassName = klassById.get(kid.klassId)
+      if (klassName && targets.has(klassName)) symbols.set(`${klassName}|${kid.name}`, kid.symbol)
+    }
+    return { symbols, defaultKlass: effectiveTarget?.toLowerCase() ?? null }
+  }, [mode, table, hasKlassColumn, mapping.klass, effectiveTarget, state.klasses, state.kids])
+
+  const prepared = useMemo(
+    () => (table ? prepareKids(table, mapping, usedSymbols, keep) : []),
+    [table, mapping, usedSymbols, keep],
+  )
+  const validCount = prepared.filter((p) => p.issues.length === 0).length
 
   async function onFile(file: File) {
     setError(null)

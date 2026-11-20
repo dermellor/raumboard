@@ -10,6 +10,8 @@ test('server-injected and explicitly configured builds use the API store', () =>
 test('a static Cockpit preview uses its proxied API', () => {
   assert.equal(shouldUseApiStore(false, undefined, '/previews/raumboard-5/'), true)
   assert.equal(shouldUseApiStore(false, undefined, '/previews/raumboard-5/index.html'), true)
+  assert.equal(shouldUseApiStore(false, undefined, '/previews/raumboard-6/'), true)
+  assert.equal(shouldUseApiStore(false, undefined, '/previews/raumboard-6/index.html'), true)
 })
 
 test('an ordinary static build remains the local demo', () => {

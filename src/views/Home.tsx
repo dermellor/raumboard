@@ -7,7 +7,7 @@ import { PasswordGate } from '../PasswordGate'
 import { roomVars } from '../roomColor'
 import { Symbol } from '../Symbol'
 import { logout, occupancy } from '../store'
-import { offeredToday } from '../boardLogic'
+import { offeredToday, visibleOnKidsBoards } from '../boardLogic'
 import { nowPoint } from '../nowPoint'
 import { useBoard, useMeta } from '../useBoard'
 
@@ -44,12 +44,13 @@ export function Home() {
         })}
       </div>
 
-      <h2>Lernräume</h2>
+      <h2>{meta.roomsHeading || 'Lernorte'}</h2>
       <div className="launcher">
         {state.rooms
           // Same rule as the picker: rooms that are not part of today's program
           // (an AG on another weekday) stay invisible for the kids.
           .filter((r) => offeredToday(r, nowPoint().day))
+          .filter(visibleOnKidsBoards)
           .map((r) => (
           <a key={r.id} href={`#/raum/${r.id}`}>
             <div className="tile room-tile" style={roomVars(r)}>

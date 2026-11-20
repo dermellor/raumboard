@@ -143,6 +143,10 @@ function connect() {
         // the symbols setting is school-wide; it reaches every board without reload
         meta = { ...meta, symbols: msg.symbols }
         notify()
+      } else if (msg.type === 'rooms-heading') {
+        // same school-wide reach as the symbols setting
+        meta = { ...meta, roomsHeading: msg.heading ?? null }
+        notify()
       } else if (msg.type === 'locked') {
         becomeLocked()
       }
@@ -206,8 +210,8 @@ export const apiStore: BoardStore = {
     mutate('/api/reseed')
   },
 
-  addRoom(name, emoji, capacity, scope, windows) {
-    mutate('/api/rooms', { name, emoji, capacity, scope, windows }, true)
+  addRoom(name, emoji, capacity, scope, windows, boardVisibility) {
+    mutate('/api/rooms', { name, emoji, capacity, scope, windows, boardVisibility }, true)
   },
   updateRoom(roomId, patch) {
     void request('PATCH', `/api/rooms/${encodeURIComponent(roomId)}`, patch, true)
@@ -326,6 +330,16 @@ export const apiStore: BoardStore = {
     const res = await post('/api/symbols', { symbols: mode }, true)
     if (res.ok) {
       setMeta({ symbols: mode })
+      return { ok: true }
+    }
+    const data = await res.json().catch(() => ({}))
+    return { ok: false, reason: data.error ?? 'Speichern fehlgeschlagen' }
+  },
+
+  async setRoomsHeading(heading): Promise<AuthResult> {
+    const res = await post('/api/rooms-heading', { heading }, true)
+    if (res.ok) {
+      setMeta({ roomsHeading: heading.trim() || null })
       return { ok: true }
     }
     const data = await res.json().catch(() => ({}))

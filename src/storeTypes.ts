@@ -43,6 +43,11 @@ export type StoreMeta = {
    * or the device's own emoji (a school may prefer them; set in the Verwaltung).
    */
   symbols?: 'openmoji' | 'native'
+  /**
+   * The heading over the room tiles on the start page: a school may rename it
+   * for its children. Null or missing means the default „Lernorte“.
+   */
+  roomsHeading?: string | null
 }
 
 export type AuthResult = { ok: true } | { ok: false; reason: string }
@@ -81,6 +86,7 @@ export type BoardStore = {
     capacity: number,
     scope: Room['scope'],
     windows?: TimeWindow[],
+    boardVisibility?: Room['boardVisibility'],
   ): void
   updateRoom(roomId: string, patch: Partial<Omit<Room, 'id'>>): void
   removeRoom(roomId: string): void
@@ -117,6 +123,7 @@ export type BoardStore = {
   changePin(password: string, pin: string): Promise<AuthResult>
   /** how the boards draw symbols — school-wide, broadcast to every device */
   setSymbols(mode: 'openmoji' | 'native'): Promise<AuthResult>
+  setRoomsHeading(heading: string): Promise<AuthResult>
 
   /** account management (owner only, api mode) */
   listAccounts(): Promise<Account[]>

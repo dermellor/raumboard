@@ -59,7 +59,7 @@ export function RaeumePage() {
       <table>
         <thead>
           <tr>
-            <th>Raum</th><th>Kapazität</th><th>Belegt</th><th>Für</th><th>Zeiten</th><th>Status</th>
+            <th>Raum</th><th>Kapazität</th><th>Belegt</th><th>Für</th><th>Zeiten</th><th>Anzeige auf den Tafeln</th><th>Status</th>
             <th className="th-add">
               <button className="add" aria-label="Raum hinzufügen" onClick={() => setModal(true)}>
                 <Plus />
@@ -122,6 +122,20 @@ export function RaeumePage() {
                 >
                   {windowsLabel(r.windows)} <Clock className="icon-soft" size={16} />
                 </button>
+              </td>
+              <td>
+                <select
+                  aria-label={`Anzeige auf den Tafeln für ${r.name}`}
+                  value={r.boardVisibility ?? 'always'}
+                  onChange={(e) =>
+                    updateRoom(r.id, {
+                      boardVisibility: e.target.value === 'open-only' ? 'open-only' : 'always',
+                    })
+                  }
+                >
+                  <option value="always">Immer anzeigen</option>
+                  <option value="open-only">Nur anzeigen, wenn geöffnet</option>
+                </select>
               </td>
               <td>
                 <button className="toggle" onClick={() => updateRoom(r.id, { isOpen: !r.isOpen })}>

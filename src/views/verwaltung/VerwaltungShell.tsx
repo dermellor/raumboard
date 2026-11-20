@@ -12,6 +12,7 @@ import { KinderPage } from './KinderPage'
 import { RaeumePage } from './RaeumePage'
 import { TafelnPage } from './TafelnPage'
 import { ZugaengePage } from './ZugaengePage'
+import { needsTeacherPin } from '../../verwaltungAccess'
 
 /**
  * The two halves of the navigation: the left one needs the teacher PIN, the
@@ -51,8 +52,10 @@ export function Verwaltung({ page }: { page: VerwaltungPage }) {
   useEffect(() => () => clearTeacherAccess(), [])
 
   const confirmedHere = confirmed?.page === page ? confirmed.password : null
-  // A dev session (operator dev link) has neither PIN nor school password to
-  // type, so both gates stay out of the way and the password pages open freely.
+  // A dev-open session may unlock the board itself, but the Verwaltung still
+  // asks for the teacher PIN on every entry. This is both the production rule
+  // and important for previews opened through an operator link: that link must
+  // not make the PIN gate disappear.
   const devOpen = meta.devOpen === true
   const needsPassword =
     meta.mode === 'api' && PASSWORD_PAGES.includes(page) && confirmedHere === null && !devOpen
@@ -63,7 +66,7 @@ export function Verwaltung({ page }: { page: VerwaltungPage }) {
   // *every* entry: the device unlock lasts months, a class does not. Component
   // state, not a cookie — leaving the namespace locks it again. The password
   // pages ask for the school's password on top of it, the same way.
-  const gateOpen = meta.mode === 'api' && !meta.teacherConfirmed && !devOpen
+  const gateOpen = needsTeacherPin(meta)
 
   return (
     <main className="admin">

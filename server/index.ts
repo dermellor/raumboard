@@ -210,6 +210,9 @@ api.get('/state', (c) => {
       symbols: hasBoard
         ? board.getConfig(db, 'symbols') === 'native' ? 'native' : 'openmoji'
         : undefined,
+      // The heading over the room tiles on the start page. A school may
+      // rename it for its children; nothing set means the default „Lernorte“.
+      roomsHeading: hasBoard ? board.getConfig(db, 'rooms_heading') || null : undefined,
     },
   })
 })
@@ -328,7 +331,7 @@ async function teacherGuard(c: any, next: () => Promise<void>) {
 }
 
 const TEACHER_PATHS = [
-  '/symbols', '/rooms', '/rooms/*', '/kids', '/kids/*', '/klasses', '/klasses/*',
+  '/symbols', '/rooms-heading', '/rooms', '/rooms/*', '/kids', '/kids/*', '/klasses', '/klasses/*',
 ]
 for (const p of TEACHER_PATHS) api.use(p, teacherGuard)
 
@@ -431,6 +434,21 @@ api.post('/symbols', async (c) => {
 })
 
 /**
+ * The heading over the room tiles on the start page, school-wide like the
+ * symbols setting: a school may rename it for its children („Ich bin hier“,
+ * say). Empty restores the default „Lernorte“. Broadcast so every board
+ * switches without a reload.
+ */
+api.post('/rooms-heading', async (c) => {
+  const boardId = c.get('boardId')
+  const { heading } = await c.req.json<{ heading?: string }>()
+  const value = typeof heading === 'string' ? heading.trim().slice(0, 60) : ''
+  board.setConfig(openBoard(boardId), 'rooms_heading', value)
+  broadcast(boardId, { type: 'rooms-heading', heading: value || null })
+  return c.json({ ok: true })
+})
+
+/**
  * The account level, and the import is all of it. It is the one mutation that
  * carries personal data in from outside and can replace the whole school's data
  * in a single step, so the `/admin/` prefix means exactly „needs the login".
@@ -456,8 +474,10 @@ api.post('/admin/import', async (c) => {
 
 /** Verwaltung CRUD — teacher level (see BOARD_PATHS). */
 api.post('/rooms', async (c) => {
-  const { name, emoji, capacity, scope, windows } = await c.req.json()
+  const { name, emoji, capacity, scope, windows, boardVisibility } = await c.req.json()
   if (!name?.trim()) return c.json({ error: 'name fehlt' }, 400)
+  if (boardVisibility !== undefined && boardVisibility !== 'always' && boardVisibility !== 'open-only')
+    return c.json({ error: 'boardVisibility ungültig' }, 400)
   board.addRoom(
     openBoard(c.get('boardId')),
     name.trim(),
@@ -465,13 +485,17 @@ api.post('/rooms', async (c) => {
     Number(capacity) || 0,
     board.normalizeScope(scope),
     board.normalizeWindows(windows),
+    boardVisibility,
   )
   broadcast(c.get('boardId'), stateMessage(c.get('boardId')))
   return c.json({ ok: true })
 })
 
 api.patch('/rooms/:id', async (c) => {
-  board.updateRoom(openBoard(c.get('boardId')), c.req.param('id'), await c.req.json())
+  const patch = await c.req.json()
+  if (patch.boardVisibility !== undefined && patch.boardVisibility !== 'always' && patch.boardVisibility !== 'open-only')
+    return c.json({ error: 'boardVisibility ungültig' }, 400)
+  board.updateRoom(openBoard(c.get('boardId')), c.req.param('id'), patch)
   broadcast(c.get('boardId'), stateMessage(c.get('boardId')))
   return c.json({ ok: true })
 })
