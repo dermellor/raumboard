@@ -21,6 +21,9 @@ Verwaltung, direkte Raumansichten, Buchungen und unabhängige Zeitfilter bleiben
 - [x] QA-Nacharbeit 2: bekannte Lehrer-PIN nur auf der Vorschaukopie setzen (`scripts/set-preview-pin.ts`, PIN 1234) und in der Testanleitung dokumentieren
 - [x] PIN-Freischaltung und Verwaltung-Token über die echte Vorschau-API verifizieren (200 auf /api/pin und /api/teacher/verify)
 
+- [x] QA-Nacharbeit 3: Medialab in der Preview-DB hatte noch die Seed-Id `foyer` → Id auf `medialab` gerichtet; `#/raum/medialab` findet den Raum jetzt im State
+- [x] Test ergänzt: geschlossene open-only-Räume bleiben im State erreichbar (direkte Raumansicht)
+
 ## Verifikation
 
 - `node --import tsx --test server/runtime-mode.test.ts server/verwaltung-access.test.ts server/room-visibility.test.ts` – Preview-Modus-, PIN- und Sichtbarkeitsprüfungen bestanden

@@ -49,6 +49,19 @@ test('neue Räume speichern Immer anzeigen als Standard und beide Varianten daue
   db.close()
 })
 
+test('geschlossene open-only-Räume bleiben im State erreichbar (direkte Raumansicht)', () => {
+  const db = openTenant('direkt', { create: true })
+  board.addRoom(db, 'Versteckt', '🚪', 4, 'all', undefined, 'open-only')
+  board.updateRoom(db, 'versteckt', { isOpen: false })
+
+  const room = board.loadState(db).rooms.find((r) => r.id === 'versteckt')
+  assert.ok(room, 'direkte Raumansicht findet den Raum über seine Id')
+  assert.equal(room.isOpen, false)
+  assert.equal(room.boardVisibility, 'open-only')
+  assert.equal(visibleOnKidsBoards(room), false)
+  db.close()
+})
+
 test('Migration übernimmt bestehende Räume rückwärtskompatibel als Immer anzeigen', () => {
   const db = new Database(path.join(DATA, 'legacy-visibility.db'))
   const migrations = path.join(HERE, 'migrations')
