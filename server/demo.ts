@@ -24,6 +24,7 @@ import { DEFAULT_TENANT, DEMO_TENANT, dbPath } from './tenant'
 
 /** Published with the demo link, so weak on purpose. */
 const LOGIN = process.env.RAUMBOARD_DEMO_LOGIN ?? 'demo@raumboard.de'
+const ADMIN_LOGIN = process.env.RAUMBOARD_DEMO_ADMIN_LOGIN ?? 'admin@raumboard.de'
 const PASSWORD = process.env.RAUMBOARD_DEMO_PASSWORD ?? 'raumboard-demo'
 const PIN = process.env.RAUMBOARD_DEMO_PIN ?? '1234'
 export const DEMO_SCHOOL_NAME = process.env.RAUMBOARD_DEMO_NAME ?? 'Demoschule'
@@ -76,7 +77,12 @@ export function isDemoBoard(id: string): boolean {
  * demo boards only — for a school this is where its password would be.
  */
 export function demoCredentials() {
-  return { email: LOGIN.toLowerCase(), password: PASSWORD, pin: PIN }
+  return {
+    email: LOGIN.toLowerCase(),
+    adminEmail: ADMIN_LOGIN.toLowerCase(),
+    password: PASSWORD,
+    pin: PIN,
+  }
 }
 
 // --- boards ------------------------------------------------------------------
@@ -91,15 +97,16 @@ function credentialHashes() {
   return hashes
 }
 
-/** Seed data plus the published credentials — also the reset target. */
+/** Seed data plus both published roles — also the reset target. */
 function seed(db: Database.Database): void {
   migrate(db, DEMO_TENANT ?? 'demo')
   board.replaceAll(db, buildSeed())
   board.setConfig(db, 'school_name', DEMO_SCHOOL_NAME)
-  // one published owner account; wiping first drops any extra account a visitor
-  // may have added through the demo, so a reset is back to a clean single login
+  // Published owner and admin accounts make both permission journeys
+  // reproducible. Wiping first drops accounts a visitor added in their session.
   db.prepare('DELETE FROM users').run()
   board.createUser(db, LOGIN.toLowerCase(), credentialHashes().admin, 'owner')
+  board.createUser(db, ADMIN_LOGIN.toLowerCase(), credentialHashes().admin, 'admin')
   board.setConfig(db, 'pin_hash', credentialHashes().pin)
   board.setConfig(db, 'pin_length', String(PIN.length))
   // back to the showcase default: the visitor may have switched the symbol

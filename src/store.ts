@@ -13,9 +13,9 @@ declare global {
   }
 }
 
-// The switch: served by the Raumboard server, the dev proxy or a Cockpit
-// preview (which proxies /api to the running backend) → api store, otherwise
-// (static prototype/demo) → localStorage store.
+// Der Schalter: bedient vom Raumboard-Server, dem Dev-Proxy oder einer Cockpit-
+// Vorschau (die /api an das laufende Backend proxyt) → api store, sonst
+// (statischer Prototyp/Demo) → localStorage store.
 const useApi = shouldUseApiStore(
   Boolean(window.__RAUMBOARD__),
   import.meta.env.VITE_API,

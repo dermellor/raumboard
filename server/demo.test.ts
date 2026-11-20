@@ -15,12 +15,22 @@ const DATA = mkdtempSync(path.join(tmpdir(), 'lb-demo-'))
 process.env.RAUMBOARD_DATA = DATA
 process.env.RAUMBOARD_DEMO_TENANT = 'demo'
 process.env.RAUMBOARD_DEMO_PASSWORD = 'geheim-demo'
+process.env.RAUMBOARD_DEMO_ADMIN_LOGIN = 'admin-demo@raumboard.de'
 process.env.RAUMBOARD_DEMO_PIN = '4321'
 process.env.RAUMBOARD_DEMO_MAX_BOARDS = '2'
 process.env.RAUMBOARD_DEFAULT_TENANT = ''
 
-const { demoBoardId, demoBoardCount, isDemoBoard, isSession, newSession, openDemoBoard, resetDemoBoard, sweepDemoBoards } =
-  await import('./demo')
+const {
+  demoBoardId,
+  demoBoardCount,
+  demoCredentials,
+  isDemoBoard,
+  isSession,
+  newSession,
+  openDemoBoard,
+  resetDemoBoard,
+  sweepDemoBoards,
+} = await import('./demo')
 const { openTenant } = await import('./tenant')
 const board = await import('./board')
 const { verifySecret } = await import('./auth')
@@ -71,7 +81,16 @@ test('the same session keeps its board across requests', () => {
   assert.notEqual(board.loadState(openDemoBoard(id)).kids.find((k) => k.id === kid.id)!.currentRoomId, null)
 })
 
-test('reset restores the seed and the published credentials', () => {
+test('published credentials identify reproducible owner and admin journeys', () => {
+  assert.deepEqual(demoCredentials(), {
+    email: 'demo@raumboard.de',
+    adminEmail: 'admin-demo@raumboard.de',
+    password: 'geheim-demo',
+    pin: '4321',
+  })
+})
+
+test('reset restores the seed and both published account roles', () => {
   clear()
   const id = demoBoardId(newSession())
   const db = openDemoBoard(id)
@@ -92,12 +111,17 @@ test('reset restores the seed and the published credentials', () => {
   assert.equal(after.kids.length, kidCount)
   assert.deepEqual(after.kids.filter((k) => k.currentRoomId !== null), [])
   assert.equal(board.getConfig(db, 'school_name'), 'Demoschule')
-  // back to the single published owner account, extras dropped
   const accounts = board.listUsers(db)
-  assert.equal(accounts.length, 1)
-  assert.equal(accounts[0].email, 'demo@raumboard.de')
-  assert.equal(accounts[0].role, 'owner')
-  assert.ok(verifySecret('geheim-demo', board.getPassHash(db, accounts[0].id)!))
+  assert.equal(accounts.length, 2)
+  assert.deepEqual(
+    accounts.map(({ email, role }) => ({ email, role })),
+    [
+      { email: 'demo@raumboard.de', role: 'owner' },
+      { email: 'admin-demo@raumboard.de', role: 'admin' },
+    ],
+  )
+  for (const account of accounts)
+    assert.ok(verifySecret('geheim-demo', board.getPassHash(db, account.id)!))
   assert.ok(verifySecret('4321', board.getConfig(db, 'pin_hash')!))
   assert.equal(board.getConfig(db, 'pin_length'), '4')
   // back to the OpenMoji default, not the visitor's choice

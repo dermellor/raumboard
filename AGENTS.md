@@ -59,7 +59,7 @@ three grants are independent:
 | --- | --- | --- | --- |
 | Device | `POST /api/pin`, teacher PIN (4 to 8 digits) | `rb_board`, 180 days | protected state, WebSocket, booking and returning |
 | Verwaltung | `POST /api/teacher/verify`, teacher PIN | signed token held in tab memory | rooms, classes, kids, symbols; required alongside account grants |
-| Account | `POST /api/login`, email + password | `rb_admin`, 30 days, carrying the account id | import, own credentials, and for an owner the roster |
+| Account | `POST /api/login`, email + password | `rb_admin`, 30 days, carrying the account id | room deletion, import, own credentials, and for an owner the roster |
 
 A locked device receives `state: null` from `/api/state`, opens no WebSocket and
 renders only the global PIN gate. `rb_admin` never substitutes for `rb_board`.
@@ -67,13 +67,13 @@ The Verwaltung token never persists: switching its pages keeps it, leaving or
 reloading the namespace drops it. The Feierabend reset is one atomic request
 with the PIN in its body and creates no further grant.
 
-**The dividing line is bulk.** The import is the one mutation that brings personal
-data in from outside and can replace the whole school's data in a single step
-(`mode: 'replace'`), and it happens about once a year, at the start of the school
-year, with the responsible person sitting in front of the list. The single-record
-Verwaltung editing (one room, one class, one child, visible and individually
-repairable) sits on the PIN. So `/api/admin/` as a path prefix means „needs an
-account", and the CRUD routes live one level up on the PIN without it.
+**The dividing line is bulk and irreversible deletion.** The import is the one
+mutation that brings personal data in from outside and can replace the whole
+school's data in a single step (`mode: 'replace'`); permanently deleting a room
+is likewise reserved for a responsible signed-in account. The remaining
+single-record Verwaltung editing (creating and changing rooms, classes, and
+children) sits on the PIN. So `/api/admin/` as a path prefix generally means
+„needs an account"; room deletion is the deliberately stricter CRUD exception.
 
 **Several accounts, two roles.** A school starts with one `owner` (the login the
 operator hands over) and the owner adds the rest in the Verwaltung. An `admin`
@@ -86,12 +86,12 @@ so the roster is reversible.
 
 The server checks each grant independently ([`server/index.ts`](server/index.ts)):
 
-| Grants held | Read and book | Verwaltung CRUD | Import and credentials |
-| --- | --- | --- | --- |
-| none | no state returned | no | no |
-| device | yes | no | no |
-| device + Verwaltung | yes | yes | no |
-| device + Verwaltung + account | yes | yes | yes; roster only for owners |
+| Grants held | Read and book | Verwaltung CRUD | Delete rooms | Import and credentials |
+| --- | --- | --- | --- | --- |
+| none | no state returned | no | no | no |
+| device | yes | no | no | no |
+| device + Verwaltung | yes | yes | no | no |
+| device + Verwaltung + account | yes | yes | yes | yes; roster only for owners |
 
 Consequences worth knowing before touching this:
 
@@ -164,6 +164,9 @@ Consequences worth knowing before touching this:
   The PIN entry *is* the confirmation there; no second dialog follows it.
 - **Deleting a class is the one PIN-level deletion that takes children with it**,
   so its confirm names their number instead of saying „samt allen Kindern".
+- **Deleting a room requires an active `admin` or `owner` account in addition
+  to the Verwaltung confirmation.** PIN-only sessions can still create, open,
+  close, and edit rooms. The UI mirrors this by hiding the delete action.
 - **`POST /api/change-pin`, `/api/change-password` and `/api/verify-password` all
   check a password in the body against the signed-in account**, so they need the
   `rb_admin` cookie (a PIN-only device is refused). The cookie says who you are,
@@ -196,8 +199,9 @@ Consequences worth knowing before touching this:
 
 [`server/access.test.ts`](server/access.test.ts) drives the level matrix through
 the real app: locked state contains no school data, device and Verwaltung grants
-are separate, reset rechecks the PIN, changing it invalidates existing devices,
-credential endpoints need all applicable grants, and password attempts share a throttle.
+are separate, room deletion distinguishes PIN-only, admin, and owner sessions,
+reset rechecks the PIN, changing it invalidates existing devices, credential
+endpoints need all applicable grants, and password attempts share a throttle.
 [`server/accounts.test.ts`](server/accounts.test.ts) drives the roster: owner
 adds and lists, the password is returned once, a duplicate is refused, an admin
 is refused the roster but does the import, the last-owner and self guards hold,

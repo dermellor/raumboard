@@ -13,6 +13,8 @@ const TENANT = 'testschule'
 const PIN = '4711'
 const EMAIL = 'leitung@testschule.example'
 const PASSWORD = 'ein-langes-passwort'
+const ADMIN_EMAIL = 'verwaltung@testschule.example'
+const ADMIN_PASSWORD = 'noch-ein-langes-passwort'
 
 process.env.RAUMBOARD_DATA = DATA
 process.env.RAUMBOARD_DEFAULT_TENANT = TENANT
@@ -28,6 +30,7 @@ const { buildSeed } = await import('../src/seed')
 const db = openTenant(TENANT, { create: true })
 board.replaceAll(db, buildSeed())
 board.createUser(db, EMAIL, hashSecret(PASSWORD), 'owner')
+board.createUser(db, ADMIN_EMAIL, hashSecret(ADMIN_PASSWORD), 'admin')
 board.setConfig(db, 'pin_hash', hashSecret(PIN))
 board.setConfig(db, 'pin_length', String(PIN.length))
 
@@ -75,10 +78,10 @@ async function teacherToken(rb_board: string): Promise<string> {
   return ((await res.json()) as { token: string }).token
 }
 
-async function adminCookie(rb_board: string): Promise<string> {
+async function adminCookie(rb_board: string, email = EMAIL, password = PASSWORD): Promise<string> {
   const res = await call('POST', '/login', {
     cookies: { rb_board },
-    body: { email: EMAIL, password: PASSWORD },
+    body: { email, password },
   })
   assert.equal(res.status, 200)
   return cookieFrom(res, 'rb_admin')
@@ -175,8 +178,37 @@ test('the device PIN reveals state and a separate confirmation opens the Verwalt
   const kid = await call('POST', '/kids', { cookies, teacher, body: { klassId, symbol: '⭐', name: 'Test T.' } })
   assert.equal(kid.status, 200)
 
-  assert.equal((await call('DELETE', `/rooms/${room.id}`, { cookies, teacher })).status, 200)
+  assert.equal((await call('DELETE', `/rooms/${room.id}`, { cookies, teacher })).status, 401)
+  assert.ok(board.loadState(db).rooms.some((candidate) => candidate.id === room.id))
   assert.equal((await call('DELETE', `/klasses/${klassId}`, { cookies, teacher })).status, 200)
+})
+
+test('active admin and owner accounts may delete rooms after PIN confirmation', async () => {
+  for (const account of [
+    { email: ADMIN_EMAIL, password: ADMIN_PASSWORD, role: 'admin' },
+    { email: EMAIL, password: PASSWORD, role: 'owner' },
+  ]) {
+    const { rb_board, teacher } = await teacherSession()
+    const rb_admin = await adminCookie(rb_board, account.email, account.password)
+    const created = await call('POST', '/rooms', {
+      cookies: { rb_board },
+      teacher,
+      body: { name: `Löschtest ${account.role}`, emoji: '🧹', capacity: 3, scope: 'all' },
+    })
+    assert.equal(created.status, 200)
+    const room = board.loadState(db).rooms.find((candidate) => candidate.name === `Löschtest ${account.role}`)!
+    const kid = board.loadState(db).kids[0]
+    assert.deepEqual(board.book(db, kid.id, room.id), { ok: true })
+
+    const deleted = await call('DELETE', `/rooms/${room.id}`, {
+      cookies: { rb_board, rb_admin },
+      teacher,
+    })
+    assert.equal(deleted.status, 200, `${account.role} should be allowed to delete`)
+    const next = board.loadState(db)
+    assert.equal(next.rooms.some((candidate) => candidate.id === room.id), false)
+    assert.equal(next.kids.find((candidate) => candidate.id === kid.id)?.currentRoomId, null)
+  }
 })
 
 test('the start-page heading is a school-wide config on the teacher level', async () => {

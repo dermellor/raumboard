@@ -5,7 +5,8 @@ import { EmojiButton } from '../../EmojiButton'
 import { Modal } from '../../components'
 import { occupancy } from '../../store'
 import { addRoom, removeRoom, updateRoom } from '../../store'
-import { useBoard } from '../../useBoard'
+import { useBoard, useMeta } from '../../useBoard'
+import { canDeleteRooms } from '../../roomPermissions'
 import { NameField, ScopeDropdown, ScopeRows } from './editing'
 
 /** Which classes may book a room, as one label: "alle" or the class names. */
@@ -29,6 +30,7 @@ function windowsLabel(windows: Room['windows']): string {
 
 export function RaeumePage() {
   const state = useBoard()
+  const meta = useMeta()
   const [modal, setModal] = useState(false)
   const [roomName, setRoomName] = useState('')
   const [roomEmoji, setRoomEmoji] = useState('🚪')
@@ -149,16 +151,18 @@ export function RaeumePage() {
                 </button>
               </td>
               <td className="td-right">
-                <button
-                  className="add danger"
-                  aria-label={`Raum ${r.name} löschen`}
-                  onClick={() => {
-                    if (confirm(`Raum „${r.name}" löschen? Eingebuchte Kinder gehen zurück in die Klasse.`))
-                      removeRoom(r.id)
-                  }}
-                >
-                  <Trash2 />
-                </button>
+                {canDeleteRooms(meta) && (
+                  <button
+                    className="add danger"
+                    aria-label={`Raum ${r.name} löschen`}
+                    onClick={() => {
+                      if (confirm(`Raum „${r.name}" löschen? Eingebuchte Kinder gehen zurück in die Klasse.`))
+                        removeRoom(r.id)
+                    }}
+                  >
+                    <Trash2 />
+                  </button>
+                )}
               </td>
             </tr>
           ))}

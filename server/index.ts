@@ -500,7 +500,7 @@ api.patch('/rooms/:id', async (c) => {
   return c.json({ ok: true })
 })
 
-api.delete('/rooms/:id', (c) => {
+api.delete('/rooms/:id', adminGuard, (c) => {
   board.removeRoom(openBoard(c.get('boardId')), c.req.param('id'))
   broadcast(c.get('boardId'), stateMessage(c.get('boardId')))
   return c.json({ ok: true })
