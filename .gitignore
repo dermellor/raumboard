@@ -23,6 +23,8 @@ dist-ssr
 *.sln
 *.sw?
 data/
+# Isolated live-data copies used only by Cockpit acceptance previews
+preview-data/
 server.test.log
 
 # AVV: Privatadresse + generierte PDFs bleiben lokal
