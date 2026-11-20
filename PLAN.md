@@ -11,15 +11,17 @@ Verwaltung, direkte Raumansichten, Buchungen und unabhängige Zeitfilter bleiben
 - [x] Auswahlfeld in der bestehenden Raumverwaltung ergänzen
 - [x] Gemeinsame Sichtbarkeitslogik für Startseite und Raumauswahl extrahieren
 - [x] API-, Persistenz- und UI-/Logiktests für Standardwert und beide Varianten ergänzen
-- [x] Tests, Lint und Build ausführen
-- [x] App mit lebendigen Daten starten, registrieren und Endpunkte prüfen
-- [x] Änderungen committen
+- [x] QA-Nacharbeit: PIN-Abfrage in der Abnahmevorschau sicherstellen
+- [x] QA-Nacharbeit: Vorschau aus einer aktuellen Produktivdaten-Kopie statt Seed-Daten betreiben
+- [x] Tests, Lint und Build erneut ausführen
+- [x] App mit Live-Daten starten, registrieren und Endpunkte prüfen
+- [x] Nacharbeit committen
 
 ## Verifikation
 
-- `node --import tsx --test server/room-visibility.test.ts` – 3/3 bestanden
-- `node --import tsx --test server/access.test.ts` – 10/10 bestanden
-- `npm test` – 73/73 bestanden
+- `node --import tsx --test server/verwaltung-access.test.ts` – 2/2 bestanden
+- `npm test` – 75/75 bestanden
 - `npm run lint` – ohne Befund
 - `npm run build` – TypeScript-Projektbuild und Vite-Produktionsbuild erfolgreich
-- HTTP-Smoke gegen Port 3666 – Startseite, PIN-Freischaltung und API-State mit 15 Räumen sowie einem geschlossenen `open-only`-Raum erfolgreich
+- `curl http://127.0.0.1:3673/` und `curl http://127.0.0.1:3673/api/state` – App-Shell erreichbar; Live-Instanz gesperrt, PIN-Gate-Metadaten vorhanden, kein Dev-Open-Bypass
+- Live-Datenbankkopie – Integritätsprüfung erfolgreich, sechs Migrationen angewendet, ein geschlossener Raum als `open-only` für die Abnahme vorbereitet
