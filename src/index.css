@@ -1313,8 +1313,9 @@ h1 {
 }
 
 /* the add button above the list: the table's narrow layout has no header
-   row to carry the "+", so the same action appears here (hidden on desktop) */
-.add-narrow {
+   row to carry the "+", so the same action appears here (hidden on desktop;
+   .admin button's display:inline-flex would beat a bare class selector) */
+.admin .add-narrow {
   display: none;
 }
 
@@ -1327,7 +1328,7 @@ h1 {
    name, occupancy and the status toggle; every other column's editor lives
    in the drawer, which the card opens anyway */
 @media (max-width: 40rem) {
-  .add-narrow {
+  .admin .add-narrow {
     display: inline-flex;
     align-items: center;
     gap: 0.45rem;
