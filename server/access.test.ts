@@ -141,8 +141,18 @@ test('the device PIN reveals state and a separate confirmation opens the Verwalt
   })
   assert.equal(withoutConfirmation.status, 403)
 
-  const created = await call('POST', '/rooms', {
+  // the PIN alone opens the Verwaltung for reading, but writes need an account
+  const teacherOnly = await call('POST', '/rooms', {
     cookies,
+    teacher,
+    body: { name: 'Leseecke', emoji: '📚', capacity: 3, scope: 'all' },
+  })
+  assert.equal(teacherOnly.status, 401)
+
+  const rb_admin = await adminCookie(rb_board)
+  const adminCookies = { rb_board, rb_admin }
+  const created = await call('POST', '/rooms', {
+    cookies: adminCookies,
     teacher,
     body: { name: 'Leseecke', emoji: '📚', capacity: 3, scope: 'all' },
   })
@@ -152,7 +162,7 @@ test('the device PIN reveals state and a separate confirmation opens the Verwalt
   assert.equal(room.boardVisibility, 'always')
 
   const visibility = await call('PATCH', `/rooms/${room.id}`, {
-    cookies,
+    cookies: adminCookies,
     teacher,
     body: { boardVisibility: 'open-only' },
   })
@@ -160,27 +170,88 @@ test('the device PIN reveals state and a separate confirmation opens the Verwalt
   assert.equal(board.loadState(db).rooms.find((r) => r.id === room.id)!.boardVisibility, 'open-only')
 
   const invalidVisibility = await call('PATCH', `/rooms/${room.id}`, {
-    cookies,
+    cookies: adminCookies,
     teacher,
     body: { boardVisibility: 'sometimes' },
   })
   assert.equal(invalidVisibility.status, 400)
   assert.equal(board.loadState(db).rooms.find((r) => r.id === room.id)!.boardVisibility, 'open-only')
 
+  // opening and closing rooms stays on the PIN: the daily operation
   const closed = await call('PATCH', `/rooms/${room.id}`, { cookies, teacher, body: { isOpen: false } })
   assert.equal(closed.status, 200)
   assert.equal(board.loadState(db).rooms.find((r) => r.id === room.id)!.isOpen, false)
 
-  const klass = await call('POST', '/klasses', { cookies, teacher, body: { name: '9Z' } })
+  const klass = await call('POST', '/klasses', { cookies: adminCookies, teacher, body: { name: '9Z' } })
   assert.equal(klass.status, 200)
   const klassId = board.loadState(db).klasses.find((k) => k.name === '9Z')!.id
 
-  const kid = await call('POST', '/kids', { cookies, teacher, body: { klassId, symbol: '⭐', name: 'Test T.' } })
+  const kid = await call('POST', '/kids', { cookies: adminCookies, teacher, body: { klassId, symbol: '⭐', name: 'Test T.' } })
   assert.equal(kid.status, 200)
 
+  // the teacher token neither deletes rooms nor classes anymore
   assert.equal((await call('DELETE', `/rooms/${room.id}`, { cookies, teacher })).status, 401)
   assert.ok(board.loadState(db).rooms.some((candidate) => candidate.id === room.id))
-  assert.equal((await call('DELETE', `/klasses/${klassId}`, { cookies, teacher })).status, 200)
+  assert.equal((await call('DELETE', `/klasses/${klassId}`, { cookies, teacher })).status, 401)
+  assert.equal((await call('DELETE', `/klasses/${klassId}`, { cookies: adminCookies, teacher })).status, 200)
+})
+
+test('a teacher with only the PIN reads the Verwaltung, operates rooms and fixes a kid', async () => {
+  const { rb_board, teacher } = await teacherSession()
+  const cookies = { rb_board }
+  const room = someRoom()
+  const klass = board.loadState(db).klasses[0]
+
+  // the daily operation: opening and closing stays on the PIN
+  const toggled = await call('PATCH', `/rooms/${room.id}`, {
+    cookies,
+    teacher,
+    body: { isOpen: !room.isOpen },
+  })
+  assert.equal(toggled.status, 200)
+
+  // the same on-the-spot fix: a kid's name and symbol stay on the PIN
+  const kid = board.loadState(db).kids[0]
+  assert.equal(
+    (await call('PATCH', `/kids/${kid.id}`, { cookies, teacher, body: { name: 'Korrekt K.', symbol: '🐝' } })).status,
+    200,
+  )
+  // moving the kid to another class changes the roster, so it stays with the account
+  assert.equal(
+    (await call('PATCH', `/kids/${kid.id}`, { cookies, teacher, body: { klassId: klass.id } })).status,
+    401,
+  )
+  assert.equal(
+    (await call('PATCH', `/kids/${kid.id}`, { cookies, teacher, body: { name: 'X', klassId: klass.id } })).status,
+    401,
+  )
+  assert.equal(
+    (await call('DELETE', `/kids/${kid.id}`, { cookies, teacher })).status,
+    401,
+  )
+  // every other write needs a person next to the PIN
+  assert.equal(
+    (await call('PATCH', `/rooms/${room.id}`, { cookies, teacher, body: { isOpen: false, name: 'Umbenannt' } })).status,
+    401,
+  )
+  assert.equal((await call('POST', '/rooms', { cookies, teacher, body: { name: 'Verboten' } })).status, 401)
+  assert.equal((await call('POST', '/klasses', { cookies, teacher, body: { name: '9Y' } })).status, 401)
+  assert.equal(
+    (await call('PATCH', `/klasses/${klass.id}`, { cookies, teacher, body: { name: '9X' } })).status,
+    401,
+  )
+  assert.equal(
+    (await call('POST', '/kids', { cookies, teacher, body: { klassId: klass.id, name: 'Nein N.' } })).status,
+    401,
+  )
+  assert.equal(
+    (await call('POST', '/symbols', { cookies, teacher, body: { symbols: 'native' } })).status,
+    401,
+  )
+  assert.equal(
+    (await call('POST', '/rooms-heading', { cookies, teacher, body: { heading: 'X' } })).status,
+    401,
+  )
 })
 
 test('active admin and owner accounts may delete rooms after PIN confirmation', async () => {
@@ -191,7 +262,7 @@ test('active admin and owner accounts may delete rooms after PIN confirmation', 
     const { rb_board, teacher } = await teacherSession()
     const rb_admin = await adminCookie(rb_board, account.email, account.password)
     const created = await call('POST', '/rooms', {
-      cookies: { rb_board },
+      cookies: { rb_board, rb_admin },
       teacher,
       body: { name: `Löschtest ${account.role}`, emoji: '🧹', capacity: 3, scope: 'all' },
     })
@@ -211,9 +282,11 @@ test('active admin and owner accounts may delete rooms after PIN confirmation', 
   }
 })
 
-test('the start-page heading is a school-wide config on the teacher level', async () => {
+test('the start-page heading is a school-wide config on the account level', async () => {
   const { rb_board, teacher } = await teacherSession()
   const cookies = { rb_board }
+  const rb_admin = await adminCookie(rb_board)
+  const adminCookies = { rb_board, rb_admin }
 
   const metaOf = async () =>
     (await (await call('GET', '/state', { cookies })).json()) as {
@@ -229,15 +302,21 @@ test('the start-page heading is a school-wide config on the teacher level', asyn
   })
   assert.equal(withoutConfirmation.status, 403)
 
+  // the PIN alone does not restyle the boards for everyone
+  assert.equal(
+    (await call('POST', '/rooms-heading', { cookies, teacher, body: { heading: 'Ich bin hier' } })).status,
+    401,
+  )
+
   const saved = await call('POST', '/rooms-heading', {
-    cookies,
+    cookies: adminCookies,
     teacher,
     body: { heading: '  Ich bin hier  ' },
   })
   assert.equal(saved.status, 200)
   assert.equal((await metaOf()).meta.roomsHeading, 'Ich bin hier')
 
-  const cleared = await call('POST', '/rooms-heading', { cookies, teacher, body: { heading: '   ' } })
+  const cleared = await call('POST', '/rooms-heading', { cookies: adminCookies, teacher, body: { heading: '   ' } })
   assert.equal(cleared.status, 200)
   assert.equal((await metaOf()).meta.roomsHeading, null)
 })
@@ -333,7 +412,8 @@ test('signing out of the account leaves the device unlocked', async () => {
 
 test('a room may serve several classes', async () => {
   const { rb_board, teacher } = await teacherSession()
-  const cookies = { rb_board }
+  const rb_admin = await adminCookie(rb_board)
+  const cookies = { rb_board, rb_admin }
   const klassId = (name: string) => board.loadState(db).klasses.find((k) => k.name === name)!.id
   const kidOf = (klassId: string) =>
     board.loadState(db).kids.find((k) => k.klassId === klassId && k.currentRoomId === null)!
@@ -363,7 +443,8 @@ test('a room may serve several classes', async () => {
 
 test('deleting a class trims the scope lists and drops emptied rooms', async () => {
   const { rb_board, teacher } = await teacherSession()
-  const cookies = { rb_board }
+  const rb_admin = await adminCookie(rb_board)
+  const cookies = { rb_board, rb_admin }
 
   for (const name of ['5A', '5B'])
     assert.equal((await call('POST', '/klasses', { cookies, teacher, body: { name } })).status, 200)

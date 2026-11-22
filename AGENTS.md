@@ -58,8 +58,8 @@ three grants are independent:
 | Grant | Created by | Storage / lifetime | Unlocks |
 | --- | --- | --- | --- |
 | Device | `POST /api/pin`, teacher PIN (4 to 8 digits) | `rb_board`, 180 days | protected state, WebSocket, booking and returning |
-| Verwaltung | `POST /api/teacher/verify`, teacher PIN | signed token held in tab memory | rooms, classes, kids, symbols; required alongside account grants |
-| Account | `POST /api/login`, email + password | `rb_admin`, 30 days, carrying the account id | room deletion, import, own credentials, and for an owner the roster |
+| Verwaltung | `POST /api/teacher/verify`, teacher PIN | signed token held in tab memory | reading the Verwaltung pages, operating rooms (open/close) and fixing a kid's name and symbol; required alongside account grants for every other write |
+| Account | `POST /api/login`, email + password | `rb_admin`, 30 days, carrying the account id | every write on the school's data: rooms, classes, kids, symbols, headings, import, own credentials, and for an owner the roster |
 
 A locked device receives `state: null` from `/api/state`, opens no WebSocket and
 renders only the global PIN gate. `rb_admin` never substitutes for `rb_board`.
@@ -67,13 +67,18 @@ The Verwaltung token never persists: switching its pages keeps it, leaving or
 reloading the namespace drops it. The Feierabend reset is one atomic request
 with the PIN in its body and creates no further grant.
 
-**The dividing line is bulk and irreversible deletion.** The import is the one
-mutation that brings personal data in from outside and can replace the whole
-school's data in a single step (`mode: 'replace'`); permanently deleting a room
-is likewise reserved for a responsible signed-in account. The remaining
-single-record Verwaltung editing (creating and changing rooms, classes, and
-children) sits on the PIN. So `/api/admin/` as a path prefix generally means
-„needs an account"; room deletion is the deliberately stricter CRUD exception.
+**The dividing line is personhood, not bulk.** The PIN is a shared secret: it
+opens the door (the device) and operates the rooms, but a shared PIN never
+changes the school's data, because writes need a person next to it. Every
+Verwaltung write therefore needs the Verwaltung token *and* a signed-in
+account (`writeGuard` in [`server/index.ts`](server/index.ts)); the shared
+PIN alone may read the Verwaltung, toggle `isOpen` and fix a kid's `name`
+and `symbol`. Those on-the-spot fixes stay on the PIN because they are the
+daily jobs at the shared tablet: the room status toggle, the kid fixes and
+the Feierabend reset. So `/api/admin/` as a path
+prefix means „needs an account", and so does everything the `writeGuard`
+sits on; room deletion is the stricter CRUD exception that even refuses a
+dev grant.
 
 **Several accounts, two roles.** A school starts with one `owner` (the login the
 operator hands over) and the owner adds the rest in the Verwaltung. An `admin`
@@ -86,12 +91,12 @@ so the roster is reversible.
 
 The server checks each grant independently ([`server/index.ts`](server/index.ts)):
 
-| Grants held | Read and book | Verwaltung CRUD | Delete rooms | Import and credentials |
-| --- | --- | --- | --- | --- |
-| none | no state returned | no | no | no |
-| device | yes | no | no | no |
-| device + Verwaltung | yes | yes | no | no |
-| device + Verwaltung + account | yes | yes | yes | yes; roster only for owners |
+| Grants held | Read and book | Verwaltung read + on-the-spot fixes | Verwaltung writes | Delete rooms | Import and credentials |
+| --- | --- | --- | --- | --- | --- |
+| none | no state returned | no | no | no | no |
+| device | yes | no | no | no | no |
+| device + Verwaltung | yes | yes: room status, kid name/symbol | no | no | no |
+| device + Verwaltung + account | yes | yes | yes | yes | yes; roster only for owners |
 
 Consequences worth knowing before touching this:
 
@@ -132,8 +137,9 @@ Consequences worth knowing before touching this:
   note there.
 - **How the boards draw symbols is a per-school config**: the Tafeln page
   (`#/verwaltung/tafeln`) offers OpenMoji (self-hosted SVGs, the default) or the
-  device's own emoji, on the PIN level like rooms, classes and kids (`config`
-  key `symbols`, `POST /api/symbols`, device plus Verwaltung grant). The change is
+  device's own emoji, on the account level like every write (`config` key
+  `symbols`, `POST /api/symbols`, device plus Verwaltung grant plus account).
+  A PIN-only session reads the current setting. The change is
   broadcast over the WebSocket, so every whiteboard switches without a reload;
   symbols without a downloaded asset always fall back to the system emoji.
   Exception: the meerkat (`U+E0DD`, file `public/emoji/E0DD.svg`) is a custom
@@ -162,11 +168,15 @@ Consequences worth knowing before touching this:
   occupancy of the whole school and sits on the start page, so on an unlocked
   whiteboard a confirm dialog would put it one tap and one „OK" away for a class.
   The PIN entry *is* the confirmation there; no second dialog follows it.
-- **Deleting a class is the one PIN-level deletion that takes children with it**,
-  so its confirm names their number instead of saying „samt allen Kindern".
-- **Deleting a room requires an active `admin` or `owner` account in addition
-  to the Verwaltung confirmation.** PIN-only sessions can still create, open,
-  close, and edit rooms. The UI mirrors this by hiding the delete action.
+- **Deleting a class takes children with it**, so its confirm names their number
+  instead of saying „samt allen Kindern"; it needs an account like every write.
+- **Every write needs an active `admin` or `owner` account in addition to the
+  Verwaltung confirmation** (`writeGuard`), with the narrow patches as the
+  exception: PIN-only sessions read the Verwaltung, open and close rooms and
+  fix a kid's name and symbol. The UI mirrors the rest by hiding the „+"
+  buttons and the delete actions, and a teacher's kid drawer disables the
+  class move. The Tafeln tab needs an account too: its page has nothing to
+  read that the boards themselves do not show.
 - **`POST /api/change-pin`, `/api/change-password` and `/api/verify-password` all
   check a password in the body against the signed-in account**, so they need the
   `rb_admin` cookie (a PIN-only device is refused). The cookie says who you are,

@@ -336,6 +336,35 @@ const TEACHER_PATHS = [
 for (const p of TEACHER_PATHS) api.use(p, teacherGuard)
 
 /**
+ * The write level: every mutation on the school's data needs a person next to
+ * the PIN. The shared teacher token opens the Verwaltung for reading, for
+ * operating rooms and for fixing a kid's name and symbol (the narrow patches
+ * below); the rest of the CRUD sits with a signed-in account. A dev cookie
+ * (the operator's dev-open link) stands in for both, as everywhere the guards
+ * ask for grants.
+ */
+async function writeGuard(c: any, next: () => Promise<void>) {
+  const auth = authInfo(c, c.get('boardId'))
+  if (!auth.hasBoard) return c.json({ error: 'locked' }, 401)
+  if (!auth.hasTeacher && !auth.hasDev) return c.json({ error: 'teacher confirmation required' }, 403)
+  if (!auth.isAdmin && !auth.hasDev) return c.json({ error: 'admin required' }, 401)
+  await next()
+}
+
+/**
+ * A narrow PATCH keeps part of a record on the PIN: the `pinKeys` are the
+ * changes that belong to the PIN's daily job (a room's status on the hallway
+ * tablet, a kid's name and symbol), every other field needs the write level.
+ */
+function narrowPatchAllowed(c: any, patch: unknown, pinKeys: string[]): boolean {
+  const auth = authInfo(c, c.get('boardId'))
+  const confirmed = auth.hasTeacher || auth.hasDev
+  const writer = (auth.isAdmin && auth.hasTeacher) || auth.hasDev
+  const pinOnly = Object.keys(patch ?? {}).every((key) => pinKeys.includes(key))
+  return confirmed && (pinOnly || writer)
+}
+
+/**
  * The account's own credentials. These need to know *which* account, so they
  * require a signed-in session (the admin cookie), not just the PIN: the body
  * password is checked against that account. A PIN-only device is refused here.
@@ -423,7 +452,7 @@ api.post('/reseed', deviceGuard, (c) => {
  * the rest of the Verwaltung, and the change is broadcast so every whiteboard
  * switches without a reload.
  */
-api.post('/symbols', async (c) => {
+api.post('/symbols', writeGuard, async (c) => {
   const boardId = c.get('boardId')
   const { symbols } = await c.req.json<{ symbols?: string }>()
   if (symbols !== 'openmoji' && symbols !== 'native')
@@ -439,7 +468,7 @@ api.post('/symbols', async (c) => {
  * say). Empty restores the default „Lernorte“. Broadcast so every board
  * switches without a reload.
  */
-api.post('/rooms-heading', async (c) => {
+api.post('/rooms-heading', writeGuard, async (c) => {
   const boardId = c.get('boardId')
   const { heading } = await c.req.json<{ heading?: string }>()
   const value = typeof heading === 'string' ? heading.trim().slice(0, 60) : ''
@@ -472,8 +501,8 @@ api.post('/admin/import', async (c) => {
   return c.json({ ok: true, ...result })
 })
 
-/** Verwaltung CRUD — teacher level (see BOARD_PATHS). */
-api.post('/rooms', async (c) => {
+/** Verwaltung CRUD — the write level (see writeGuard). */
+api.post('/rooms', writeGuard, async (c) => {
   const { name, emoji, capacity, scope, windows, boardVisibility } = await c.req.json()
   if (!name?.trim()) return c.json({ error: 'name fehlt' }, 400)
   if (boardVisibility !== undefined && boardVisibility !== 'always' && boardVisibility !== 'open-only')
@@ -491,8 +520,14 @@ api.post('/rooms', async (c) => {
   return c.json({ ok: true })
 })
 
+/**
+ * The teacher slice of a room patch: opening and closing is the daily
+ * operation on the shared hallway tablet, so an `isOpen`-only patch stays on
+ * the PIN. Any other field needs the write level.
+ */
 api.patch('/rooms/:id', async (c) => {
   const patch = await c.req.json()
+  if (!narrowPatchAllowed(c, patch, ['isOpen'])) return c.json({ error: 'admin required' }, 401)
   if (patch.boardVisibility !== undefined && patch.boardVisibility !== 'always' && patch.boardVisibility !== 'open-only')
     return c.json({ error: 'boardVisibility ungültig' }, 400)
   board.updateRoom(openBoard(c.get('boardId')), c.req.param('id'), patch)
@@ -506,7 +541,7 @@ api.delete('/rooms/:id', adminGuard, (c) => {
   return c.json({ ok: true })
 })
 
-api.post('/kids', async (c) => {
+api.post('/kids', writeGuard, async (c) => {
   const { klassId, symbol, name } = await c.req.json()
   if (!name?.trim() || !klassId) return c.json({ error: 'name/klassId fehlt' }, 400)
   board.addKid(openBoard(c.get('boardId')), klassId, symbol || '⭐', name.trim())
@@ -514,19 +549,26 @@ api.post('/kids', async (c) => {
   return c.json({ ok: true })
 })
 
+/**
+ * The teacher slice of a kid patch: a wrong name or symbol is what a teacher
+ * fixes on the spot, so `name` and `symbol` stay on the PIN. Moving a kid to
+ * another class changes the roster, so it needs the write level.
+ */
 api.patch('/kids/:id', async (c) => {
-  board.updateKid(openBoard(c.get('boardId')), c.req.param('id'), await c.req.json())
+  const patch = await c.req.json()
+  if (!narrowPatchAllowed(c, patch, ['name', 'symbol'])) return c.json({ error: 'admin required' }, 401)
+  board.updateKid(openBoard(c.get('boardId')), c.req.param('id'), patch)
   broadcast(c.get('boardId'), stateMessage(c.get('boardId')))
   return c.json({ ok: true })
 })
 
-api.delete('/kids/:id', (c) => {
+api.delete('/kids/:id', writeGuard, (c) => {
   board.removeKid(openBoard(c.get('boardId')), c.req.param('id'))
   broadcast(c.get('boardId'), stateMessage(c.get('boardId')))
   return c.json({ ok: true })
 })
 
-api.post('/klasses', async (c) => {
+api.post('/klasses', writeGuard, async (c) => {
   const { name, emoji } = await c.req.json()
   if (!name?.trim()) return c.json({ error: 'name fehlt' }, 400)
   board.addKlass(openBoard(c.get('boardId')), name.trim(), emoji || undefined)
@@ -534,13 +576,13 @@ api.post('/klasses', async (c) => {
   return c.json({ ok: true })
 })
 
-api.patch('/klasses/:id', async (c) => {
+api.patch('/klasses/:id', writeGuard, async (c) => {
   board.updateKlass(openBoard(c.get('boardId')), c.req.param('id'), await c.req.json())
   broadcast(c.get('boardId'), stateMessage(c.get('boardId')))
   return c.json({ ok: true })
 })
 
-api.delete('/klasses/:id', (c) => {
+api.delete('/klasses/:id', writeGuard, (c) => {
   board.removeKlass(openBoard(c.get('boardId')), c.req.param('id'))
   broadcast(c.get('boardId'), stateMessage(c.get('boardId')))
   return c.json({ ok: true })

@@ -68,6 +68,14 @@ export function Verwaltung({ page }: { page: VerwaltungPage }) {
   // pages ask for the school's password on top of it, the same way.
   const gateOpen = needsTeacherPin(meta)
 
+  // The Tafeln page is all write affordances (what it configures is only
+  // readable on the board itself), so it is an account page: teachers see no
+  // tab, and a deep link lands on the rooms.
+  const tafelnHidden = page === 'tafeln' && meta.mode === 'api' && !meta.isAdmin
+  useEffect(() => {
+    if (tafelnHidden) window.location.hash = '#/verwaltung/raeume'
+  }, [tafelnHidden])
+
   return (
     <main className="admin">
       <div className="topbar">
@@ -92,7 +100,11 @@ export function Verwaltung({ page }: { page: VerwaltungPage }) {
       ) : (
         <>
           <nav className="tabbar">
-            {PAGES.filter((p) => !API_ONLY_PAGES.includes(p.page) || meta.mode === 'api').map(
+            {PAGES.filter(
+              (p) =>
+                (!API_ONLY_PAGES.includes(p.page) || meta.mode === 'api') &&
+                (p.page !== 'tafeln' || meta.isAdmin),
+            ).map(
               (p, i, all) => (
                 <span key={p.page} className="tabbar-slot">
                   {/* the rule between the halves is the only visible

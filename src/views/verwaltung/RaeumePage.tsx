@@ -312,20 +312,26 @@ export function RaeumePage() {
 
   return (
     <section>
-      <button className="add-narrow" onClick={() => setDrawer({ kind: 'new' })}>
-        <Plus /> Raum hinzufügen
-      </button>
+      {/* creating is the admin's job; a teacher with the PIN reads the
+          same tables and only operates rooms (see roomPermissions) */}
+      {meta.isAdmin && (
+        <button className="add-narrow" onClick={() => setDrawer({ kind: 'new' })}>
+          <Plus /> Raum hinzufügen
+        </button>
+      )}
       <div className="rooms-table-wrap">
         <table className="rooms-table">
         <thead>
           <tr>
             <th>Raum</th><th className="col-kap">Kapazität</th><th className="col-belegt">Belegt</th><th className="col-fuer">Für</th><th className="col-times">Zeiten</th><th className="col-anzeige">Anzeige auf den Tafeln</th><th>Status</th>
             {/* the + and the pencil share the last column: one flush-right slot */}
-            <th className="th-add">
-              <button className="add" aria-label="Raum hinzufügen" onClick={() => setDrawer({ kind: 'new' })}>
-                <Plus />
-              </button>
-            </th>
+            {meta.isAdmin && (
+              <th className="th-add">
+                <button className="add" aria-label="Raum hinzufügen" onClick={() => setDrawer({ kind: 'new' })}>
+                  <Plus />
+                </button>
+              </th>
+            )}
           </tr>
         </thead>
         <tbody>

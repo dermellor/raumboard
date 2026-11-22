@@ -14,9 +14,12 @@ const ImportWizard = lazy(() =>
   import('../../import/ImportWizard').then((m) => ({ default: m.ImportWizard })),
 )
 
-/** The kid in the drawer: fields commit immediately, like every drawer. */
+/** The kid in the drawer: fields commit immediately, like every drawer. A
+ * teacher with the PIN sees the same drawer as an admin; only the class move
+ * and the delete stay with the account. */
 function KidDrawer({ kidId, onClose }: { kidId: string; onClose: () => void }) {
   const state = useBoard()
+  const meta = useMeta()
   const kid = state.kids.find((k) => k.id === kidId)
   if (!kid) return null
   const klass = state.klasses.find((c) => c.id === kid.klassId)
@@ -30,17 +33,19 @@ function KidDrawer({ kidId, onClose }: { kidId: string; onClose: () => void }) {
       }
       onClose={onClose}
       footer={
-        <button
-          className="add danger"
-          onClick={() => {
-            if (confirm(`${kid.name} löschen?`)) {
-              removeKid(kid.id)
-              onClose()
-            }
-          }}
+        meta.isAdmin && (
+          <button
+            className="add danger"
+            onClick={() => {
+              if (confirm(`${kid.name} löschen?`)) {
+                removeKid(kid.id)
+                onClose()
+              }
+            }}
         >
           <Trash2 /> Kind löschen
         </button>
+        )
       }
     >
       <div className="field">
@@ -61,9 +66,12 @@ function KidDrawer({ kidId, onClose }: { kidId: string; onClose: () => void }) {
       </div>
       <div className="field">
         <label htmlFor={`kid-klass-${kid.id}`}>Klasse</label>
+        {/* moving a kid changes the roster, so unlike name and symbol it
+            needs an account (see the narrow patch in server/index.ts) */}
         <select
           id={`kid-klass-${kid.id}`}
           value={kid.klassId}
+          disabled={!meta.isAdmin}
           onChange={(e) => updateKid(kid.id, { klassId: e.target.value })}
         >
           {state.klasses.map((c) => (
@@ -130,6 +138,7 @@ function NewKidDrawer({ klassId, onClose }: { klassId: string; onClose: () => vo
 /** The class in the drawer; its roster lives in the bandarole, not here. */
 function KlassDrawer({ klassId, onClose }: { klassId: string; onClose: () => void }) {
   const state = useBoard()
+  const meta = useMeta()
   const klass = state.klasses.find((c) => c.id === klassId)
   if (!klass) return null
   const kidCount = state.kids.filter((k) => k.klassId === klass.id).length
@@ -143,23 +152,25 @@ function KlassDrawer({ klassId, onClose }: { klassId: string; onClose: () => voi
       }
       onClose={onClose}
       footer={
-        <button
-          className="add danger"
-          onClick={() => {
-            // the number is in the question because this is the one
-            // deletion on the PIN level that takes children with it
-            if (
-              confirm(
-                `Klasse ${klass.name} samt ${kidCount} ${kidCount === 1 ? 'Kind' : 'Kindern'} und klassengebundenen Räumen löschen?`,
-              )
-            ) {
-              removeKlass(klass.id)
-              onClose()
-            }
-          }}
-        >
-          <Trash2 /> Klasse löschen
-        </button>
+        meta.isAdmin && (
+          <button
+            className="add danger"
+            onClick={() => {
+              // the number is in the question because this deletion takes
+              // children with it — and it needs an account, like every write
+              if (
+                confirm(
+                  `Klasse ${klass.name} samt ${kidCount} ${kidCount === 1 ? 'Kind' : 'Kindern'} und klassengebundenen Räumen löschen?`,
+                )
+              ) {
+                removeKlass(klass.id)
+                onClose()
+              }
+            }}
+          >
+            <Trash2 /> Klasse löschen
+          </button>
+        )
       }
     >
       <div className="field">
@@ -248,9 +259,13 @@ export function KinderPage() {
 
   return (
     <section>
-      <button onClick={() => setNewKlass(true)}>
-        <Plus /> Klasse hinzufügen
-      </button>
+      {/* creating classes and kids edits the roster, so it needs a signed-in
+          account; a teacher with the PIN only fixes a kid's name and symbol */}
+      {meta.isAdmin && (
+        <button onClick={() => setNewKlass(true)}>
+          <Plus /> Klasse hinzufügen
+        </button>
+      )}
 
       {state.klasses.map((c) => {
         const kids = state.kids.filter((k) => k.klassId === c.id)
@@ -267,13 +282,15 @@ export function KinderPage() {
                   <ChevronDown className="chevron" />
                   <Symbol className="emoji" value={c.emoji || '🚪'} />
                   <span className="klass-name">Klasse {c.name}</span>
-                  <button
-                    className="edit"
-                    aria-label={`Klasse ${c.name} bearbeiten`}
-                    onClick={() => setEditKlass(c.id)}
-                  >
-                    <Pencil />
-                  </button>
+                  {meta.isAdmin && (
+                    <button
+                      className="edit"
+                      aria-label={`Klasse ${c.name} bearbeiten`}
+                      onClick={() => setEditKlass(c.id)}
+                    >
+                      <Pencil />
+                    </button>
+                  )}
                   <span className="count">
                     {kids.length} {kids.length === 1 ? 'Kind' : 'Kinder'}
                   </span>
@@ -281,15 +298,20 @@ export function KinderPage() {
                 <table>
                   <thead>
                     <tr>
+                      {/* the third header cell always exists: teachers see
+                          the kid pencils too, and a missing cell would end the
+                          header line one column early */}
                       <th>Kind</th><th>Klasse</th>
                       <th className="th-add">
-                        <button
-                          className="add"
-                          aria-label={`Kind in Klasse ${c.name} hinzufügen`}
-                          onClick={() => setNewKid(c.id)}
-                        >
-                          <Plus />
-                        </button>
+                        {meta.isAdmin && (
+                          <button
+                            className="add"
+                            aria-label={`Kind in Klasse ${c.name} hinzufügen`}
+                            onClick={() => setNewKid(c.id)}
+                          >
+                            <Plus />
+                          </button>
+                        )}
                       </th>
                     </tr>
                   </thead>
@@ -303,6 +325,8 @@ export function KinderPage() {
                           </div>
                         </td>
                         <td>Klasse {c.name}</td>
+                        {/* the pencil is the teacher's daily fix: name and symbol
+                            stay on the PIN, the class move inside needs an account */}
                         <td className="td-edit">
                           <button
                             className="row-edit"

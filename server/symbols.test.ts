@@ -85,7 +85,7 @@ test('default is OpenMoji', async () => {
   assert.equal(await symbolsOf(await pinCookie()), 'openmoji')
 })
 
-test('changing symbols needs an unlocked device and a Verwaltung confirmation', async () => {
+test('changing symbols needs an unlocked device, a Verwaltung confirmation and an account', async () => {
   const pin = await pinCookie()
   const teacher = await teacherToken(pin)
   const adminLogin = await call('POST', '/login', {
@@ -101,8 +101,19 @@ test('changing symbols needs an unlocked device and a Verwaltung confirmation', 
 
   assert.equal((await call('POST', '/symbols', { body: { symbols: 'openmoji' } })).status, 401)
 
+  // the PIN alone no longer changes the boards' look
   assert.equal(
-    (await call('POST', '/symbols', { body: { symbols: 'native' }, cookies: { rb_board: pin }, teacher })).status,
+    (await call('POST', '/symbols', { body: { symbols: 'openmoji' }, cookies: { rb_board: pin }, teacher })).status,
+    401,
+  )
+  assert.equal(
+    (
+      await call('POST', '/symbols', {
+        body: { symbols: 'native' },
+        cookies: { rb_board: pin, rb_admin: admin },
+        teacher,
+      })
+    ).status,
     200,
   )
   assert.equal(await symbolsOf(pin), 'native')
@@ -111,8 +122,19 @@ test('changing symbols needs an unlocked device and a Verwaltung confirmation', 
 test('garbage values are refused and change nothing', async () => {
   const pin = await pinCookie()
   const teacher = await teacherToken(pin)
+  const adminLogin = await call('POST', '/login', {
+    cookies: { rb_board: pin },
+    body: { email: EMAIL, password: PASSWORD },
+  })
+  const admin = cookieFrom(adminLogin, 'rb_admin')
   assert.equal(
-    (await call('POST', '/symbols', { body: { symbols: 'twemoji' }, cookies: { rb_board: pin }, teacher })).status,
+    (
+      await call('POST', '/symbols', {
+        body: { symbols: 'twemoji' },
+        cookies: { rb_board: pin, rb_admin: admin },
+        teacher,
+      })
+    ).status,
     400,
   )
   assert.equal(await symbolsOf(pin), 'native')

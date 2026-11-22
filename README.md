@@ -52,8 +52,12 @@ Kids never log in. Access has three independent levels:
 | Level | What it opens | Lifetime |
 | --- | --- | --- |
 | Device unlock | school data, booking and returning | `rb_board`, 180 days |
-| Verwaltung confirmation | rooms, classes, kids and board display settings | this Verwaltung visit; held in tab memory |
-| Admin account | import, own credentials, and for owners the account roster | `rb_admin`, 30 days |
+| Verwaltung confirmation | reading rooms, classes, kids and board display settings, operating rooms, fixing a kid's name and symbol | this Verwaltung visit; held in tab memory |
+| Admin account | every other write: import, rooms, classes, the kid roster, board display settings, own credentials, and for owners the account roster | `rb_admin`, 30 days |
+
+The PIN is a shared secret, so it never writes the school's data: teachers
+with the PIN read the Verwaltung, open and close rooms and fix a kid's name
+and symbol on the spot; changing anything else needs a signed-in account.
 
 A school starts with one owner account and the owner adds the rest under
 „Konten" on the Verwaltung's Zugänge page. There are two roles: an

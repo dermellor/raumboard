@@ -4,9 +4,9 @@ import { useMeta } from '../../useBoard'
 import { setSymbols, setRoomsHeading } from '../../store'
 
 /**
- * How the boards draw symbols, school-wide and at once. This page sits on the
- * teacher PIN like rooms, classes and kids: it changes how the boards look,
- * and it can be switched back in the same tap.
+ * How the boards draw symbols, school-wide and at once. Every write on this
+ * page needs a signed-in account: it changes the boards for everyone, while a
+ * teacher with the PIN only reads the current setting.
  */
 export function TafelnPage() {
   const meta = useMeta()
@@ -26,6 +26,7 @@ export function TafelnPage() {
               type="radio"
               name="symbols"
               checked={current === 'openmoji'}
+              disabled={!meta.isAdmin}
               onChange={() => void setSymbols('openmoji')}
             />
             <Symbol className="settings-preview" value="🐱" force="openmoji" />
@@ -45,6 +46,7 @@ export function TafelnPage() {
               type="radio"
               name="symbols"
               checked={current === 'native'}
+              disabled={!meta.isAdmin}
               onChange={() => void setSymbols('native')}
             />
             <Symbol className="settings-preview" value="🐱" force="native" />
@@ -71,17 +73,20 @@ export function TafelnPage() {
             value={headingValue}
             placeholder="Lernorte"
             maxLength={60}
+            disabled={!meta.isAdmin}
             onChange={(e) => setHeadingDraft(e.target.value)}
           />
-          <button
-            disabled={headingValue.trim() === (meta.roomsHeading ?? '')}
-            onClick={() => {
-              void setRoomsHeading(headingValue)
-              setHeadingDraft(null)
-            }}
-          >
-            speichern
-          </button>
+          {meta.isAdmin && (
+            <button
+              disabled={headingValue.trim() === (meta.roomsHeading ?? '')}
+              onClick={() => {
+                void setRoomsHeading(headingValue)
+                setHeadingDraft(null)
+              }}
+            >
+              speichern
+            </button>
+          )}
         </div>
       </section>
     </>
