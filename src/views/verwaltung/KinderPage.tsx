@@ -1,10 +1,9 @@
 import { ChevronDown, FileUp, Pencil, Plus, Trash2 } from 'lucide-react'
 import { lazy, Suspense, useState } from 'react'
-import type { Klass } from '../../types'
 import { EmojiButton } from '../../EmojiButton'
-import { Modal } from '../../components'
 import { PasswordGate } from '../../PasswordGate'
 import { Symbol } from '../../Symbol'
+import { Drawer } from '../../Drawer'
 import { addKid, addKlass, removeKid, removeKlass, updateKid, updateKlass } from '../../store'
 import { useBoard, useMeta } from '../../useBoard'
 import { NameField } from './editing'
@@ -15,43 +14,241 @@ const ImportWizard = lazy(() =>
   import('../../import/ImportWizard').then((m) => ({ default: m.ImportWizard })),
 )
 
+/** The kid in the drawer: fields commit immediately, like every drawer. */
+function KidDrawer({ kidId, onClose }: { kidId: string; onClose: () => void }) {
+  const state = useBoard()
+  const kid = state.kids.find((k) => k.id === kidId)
+  if (!kid) return null
+  const klass = state.klasses.find((c) => c.id === kid.klassId)
+
+  return (
+    <Drawer
+      title={
+        <>
+          <Symbol value={kid.symbol} /> {kid.name}
+        </>
+      }
+      onClose={onClose}
+      footer={
+        <button
+          className="add danger"
+          onClick={() => {
+            if (confirm(`${kid.name} löschen?`)) {
+              removeKid(kid.id)
+              onClose()
+            }
+          }}
+        >
+          <Trash2 /> Kind löschen
+        </button>
+      }
+    >
+      <div className="field">
+        <label>Symbol</label>
+        <EmojiButton
+          value={kid.symbol}
+          label={`Symbol für ${kid.name}`}
+          onChange={(symbol) => updateKid(kid.id, { symbol })}
+        />
+      </div>
+      <div className="field">
+        <label htmlFor={`kid-name-${kid.id}`}>Name</label>
+        <NameField
+          value={kid.name}
+          label={`Name von ${kid.name}`}
+          onCommit={(name) => updateKid(kid.id, { name })}
+        />
+      </div>
+      <div className="field">
+        <label htmlFor={`kid-klass-${kid.id}`}>Klasse</label>
+        <select
+          id={`kid-klass-${kid.id}`}
+          value={kid.klassId}
+          onChange={(e) => updateKid(kid.id, { klassId: e.target.value })}
+        >
+          {state.klasses.map((c) => (
+            <option key={c.id} value={c.id}>Klasse {c.name}</option>
+          ))}
+        </select>
+      </div>
+      {klass && (
+        <p className="hint">
+          Ein Kind bucht nur Lernorte, die für seine Klasse freigegeben sind („Für" beim Raum).
+        </p>
+      )}
+    </Drawer>
+  )
+}
+
+/** The same drawer in create mode: preselects the class the table sits in. */
+function NewKidDrawer({ klassId, onClose }: { klassId: string; onClose: () => void }) {
+  const state = useBoard()
+  const [name, setName] = useState('')
+  const [symbol, setSymbol] = useState('⭐')
+  const [klass, setKlass] = useState(klassId)
+
+  return (
+    <Drawer title="Kind hinzufügen" onClose={onClose}>
+      <div className="field">
+        <label>Symbol</label>
+        <EmojiButton value={symbol} label="Symbol für neues Kind" onChange={setSymbol} />
+      </div>
+      <div className="field">
+        <label htmlFor="kid-name-new">Name</label>
+        <input
+          id="kid-name-new"
+          placeholder="z.B. Mina K."
+          value={name}
+          autoFocus
+          onChange={(e) => setName(e.target.value)}
+        />
+      </div>
+      <div className="field">
+        <label htmlFor="kid-klass-new">Klasse</label>
+        <select id="kid-klass-new" value={klass} onChange={(e) => setKlass(e.target.value)}>
+          {state.klasses.map((c) => (
+            <option key={c.id} value={c.id}>Klasse {c.name}</option>
+          ))}
+        </select>
+      </div>
+      <div className="field">
+        <button
+          className="primary"
+          disabled={!name.trim() || !klass}
+          onClick={() => {
+            addKid(klass, symbol || '⭐', name.trim())
+            onClose()
+          }}
+        >
+          anlegen
+        </button>
+      </div>
+    </Drawer>
+  )
+}
+
+/** The class in the drawer; its roster lives in the bandarole, not here. */
+function KlassDrawer({ klassId, onClose }: { klassId: string; onClose: () => void }) {
+  const state = useBoard()
+  const klass = state.klasses.find((c) => c.id === klassId)
+  if (!klass) return null
+  const kidCount = state.kids.filter((k) => k.klassId === klass.id).length
+
+  return (
+    <Drawer
+      title={
+        <>
+          <Symbol value={klass.emoji || '🚪'} /> Klasse {klass.name}
+        </>
+      }
+      onClose={onClose}
+      footer={
+        <button
+          className="add danger"
+          onClick={() => {
+            // the number is in the question because this is the one
+            // deletion on the PIN level that takes children with it
+            if (
+              confirm(
+                `Klasse ${klass.name} samt ${kidCount} ${kidCount === 1 ? 'Kind' : 'Kindern'} und klassengebundenen Räumen löschen?`,
+              )
+            ) {
+              removeKlass(klass.id)
+              onClose()
+            }
+          }}
+        >
+          <Trash2 /> Klasse löschen
+        </button>
+      }
+    >
+      <div className="field">
+        <label>Symbol</label>
+        <EmojiButton
+          value={klass.emoji ?? ''}
+          label={`Emoji für Klasse ${klass.name}`}
+          onChange={(emoji) => updateKlass(klass.id, { emoji })}
+        />
+      </div>
+      <div className="field">
+        <label htmlFor={`klass-name-${klass.id}`}>Name</label>
+        <NameField
+          value={klass.name}
+          label={`Name von Klasse ${klass.name}`}
+          onCommit={(name) => updateKlass(klass.id, { name })}
+        />
+      </div>
+      <p className="hint">
+        {kidCount} {kidCount === 1 ? 'Kind' : 'Kinder'} in dieser Klasse; die Liste steht
+        unter der Klassenleiste auf der Seite.
+      </p>
+    </Drawer>
+  )
+}
+
+/** The same drawer in create mode. */
+function NewKlassDrawer({ onClose }: { onClose: () => void }) {
+  const [name, setName] = useState('')
+  const [emoji, setEmoji] = useState('🚪')
+
+  return (
+    <Drawer title="Klasse hinzufügen" onClose={onClose}>
+      <div className="field">
+        <label>Symbol</label>
+        <EmojiButton value={emoji} label="Emoji für neue Klasse" onChange={setEmoji} />
+      </div>
+      <div className="field">
+        <label htmlFor="klass-name-new">Name</label>
+        <input
+          id="klass-name-new"
+          placeholder="z.B. 1C"
+          value={name}
+          autoFocus
+          onChange={(e) => setName(e.target.value)}
+        />
+      </div>
+      <div className="field">
+        <button
+          className="primary"
+          disabled={!name.trim()}
+          onClick={() => {
+            addKlass(name.trim(), emoji || undefined)
+            setName('')
+            onClose()
+          }}
+        >
+          anlegen
+        </button>
+      </div>
+    </Drawer>
+  )
+}
+
 /**
  * Classes and kids, one table per class: the bandarole carries the class
- * (symbol, name, pencil for the editing modal, kid count) and the table
- * under it carries its own column titles and the „Kind hinzufügen" button.
- * The bandarole is collapsed by default, so the page reads as a class list
- * and opens into a roster on demand. The import lives here too, as the
- * button at the foot, because it replaces exactly what this page shows.
+ * (symbol, name, pencil for the drawer, kid count) and the table under it
+ * reads as a roster (symbol, name, class — plain text, editing through the
+ * pencil's drawer). The bandarole is collapsed by default, so the page reads
+ * as a class list and opens into a roster on demand. The import lives here
+ * too, as the button at the foot, because it replaces exactly what this page
+ * shows.
  */
 export function KinderPage() {
   const state = useBoard()
   const meta = useMeta()
-  const [klassModal, setKlassModal] = useState(false)
-  const [klassName, setKlassName] = useState('')
-  const [klassEmoji, setKlassEmoji] = useState('🚪')
-  // the class being edited in the modal, plus the draft fields it saves
-  const [editKlass, setEditKlass] = useState<Klass | null>(null)
-  const [editName, setEditName] = useState('')
-  const [editEmoji, setEditEmoji] = useState('')
-  const [kidModal, setKidModal] = useState(false)
-  const [kidName, setKidName] = useState('')
-  const [kidSymbol, setKidSymbol] = useState('⭐')
-  const [kidKlass, setKidKlass] = useState('')
+  const [newKlass, setNewKlass] = useState(false)
+  const [editKlass, setEditKlass] = useState<string | null>(null)
+  const [newKid, setNewKid] = useState<string | null>(null)
+  const [editKid, setEditKid] = useState<string | null>(null)
   // the import asks for the school's password on every click: it happens
   // about once a year, and a 30-day session cookie may not be what replaces
   // the data of the whole school
   const [gateOpen, setGateOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
 
-  const openEdit = (c: Klass) => {
-    setEditKlass(c)
-    setEditName(c.name)
-    setEditEmoji(c.emoji ?? '')
-  }
-
   return (
     <section>
-      <button onClick={() => setKlassModal(true)}>
+      <button onClick={() => setNewKlass(true)}>
         <Plus /> Klasse hinzufügen
       </button>
 
@@ -59,12 +256,12 @@ export function KinderPage() {
         const kids = state.kids.filter((k) => k.klassId === c.id)
         return (
           <details key={c.id} className="klass">
-                {/* the bandarole is the class editor: clicking a control must
-                    not expand or collapse, so those clicks do not toggle */}
+                {/* the bandarole is the class header: clicking the pencil must
+                    not expand or collapse, so its click does not toggle */}
                 <summary
                   className="klass-bandarole"
                   onClick={(e) => {
-                    if ((e.target as HTMLElement).closest('button, input')) e.preventDefault()
+                    if ((e.target as HTMLElement).closest('button')) e.preventDefault()
                   }}
                 >
                   <ChevronDown className="chevron" />
@@ -73,7 +270,7 @@ export function KinderPage() {
                   <button
                     className="edit"
                     aria-label={`Klasse ${c.name} bearbeiten`}
-                    onClick={() => openEdit(c)}
+                    onClick={() => setEditKlass(c.id)}
                   >
                     <Pencil />
                   </button>
@@ -89,10 +286,7 @@ export function KinderPage() {
                         <button
                           className="add"
                           aria-label={`Kind in Klasse ${c.name} hinzufügen`}
-                          onClick={() => {
-                            setKidKlass(c.id)
-                            setKidModal(true)
-                          }}
+                          onClick={() => setNewKid(c.id)}
                         >
                           <Plus />
                         </button>
@@ -103,36 +297,19 @@ export function KinderPage() {
                     {kids.map((k) => (
                       <tr key={k.id}>
                         <td className="cell-name">
-                          <EmojiButton
-                            value={k.symbol}
-                            label={`Symbol für ${k.name}`}
-                            onChange={(symbol) => updateKid(k.id, { symbol })}
-                          />
-                          <NameField
-                            value={k.name}
-                            label={`Name von ${k.name}`}
-                            onCommit={(name) => updateKid(k.id, { name })}
-                          />
+                          <div className="cell-name-inner">
+                            <Symbol className="emoji" value={k.symbol} />
+                            <span className="kid-name">{k.name}</span>
+                          </div>
                         </td>
-                        <td>
-                          <select
-                            value={k.klassId}
-                            onChange={(e) => updateKid(k.id, { klassId: e.target.value })}
-                          >
-                            {state.klasses.map((c2) => (
-                              <option key={c2.id} value={c2.id}>Klasse {c2.name}</option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="td-right">
+                        <td>Klasse {c.name}</td>
+                        <td className="td-edit">
                           <button
-                            className="add danger"
-                            aria-label={`${k.name} löschen`}
-                            onClick={() => {
-                              if (confirm(`${k.name} löschen?`)) removeKid(k.id)
-                            }}
+                            className="row-edit"
+                            aria-label={`${k.name} bearbeiten`}
+                            onClick={() => setEditKid(k.id)}
                           >
-                            <Trash2 />
+                            <Pencil />
                           </button>
                         </td>
                       </tr>
@@ -165,122 +342,10 @@ export function KinderPage() {
         </Suspense>
       )}
 
-      {klassModal && (
-        <Modal title="Klasse hinzufügen" onClose={() => setKlassModal(false)}>
-          <div className="field">
-            <label>Symbol</label>
-            <EmojiButton value={klassEmoji} label="Emoji für neue Klasse" onChange={setKlassEmoji} />
-          </div>
-          <div className="field">
-            <label htmlFor="klass-name">Name</label>
-            <input
-              id="klass-name"
-              placeholder="z.B. 1C"
-              value={klassName}
-              autoFocus
-              onChange={(e) => setKlassName(e.target.value)}
-            />
-          </div>
-          <button
-            disabled={!klassName.trim()}
-            onClick={() => {
-              addKlass(klassName.trim(), klassEmoji || undefined)
-              setKlassName('')
-              setKlassModal(false)
-            }}
-          >
-            anlegen
-          </button>
-        </Modal>
-      )}
-
-      {editKlass && (
-        <Modal title={`Klasse ${editKlass.name} bearbeiten`} onClose={() => setEditKlass(null)}>
-          <div className="field">
-            <label>Symbol</label>
-            <EmojiButton
-              value={editEmoji}
-              label={`Emoji für Klasse ${editKlass.name}`}
-              onChange={setEditEmoji}
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="edit-klass-name">Name</label>
-            <input
-              id="edit-klass-name"
-              value={editName}
-              autoFocus
-              onChange={(e) => setEditName(e.target.value)}
-            />
-          </div>
-          <button
-            className="primary"
-            disabled={!editName.trim() || editName.trim() === editKlass.name && editEmoji === (editKlass.emoji ?? '')}
-            onClick={() => {
-              updateKlass(editKlass.id, { name: editName.trim(), emoji: editEmoji })
-              setEditKlass(null)
-            }}
-          >
-            speichern
-          </button>
-          {/* the number is in the question because this is the one
-              deletion on the PIN level that takes children with it */}
-          <button
-            className="danger"
-            onClick={() => {
-              const kidCount = state.kids.filter((k) => k.klassId === editKlass.id).length
-              if (
-                confirm(
-                  `Klasse ${editKlass.name} samt ${kidCount} ${kidCount === 1 ? 'Kind' : 'Kindern'} und klassengebundenen Räumen löschen?`,
-                )
-              ) {
-                removeKlass(editKlass.id)
-                setEditKlass(null)
-              }
-            }}
-          >
-            <Trash2 /> Klasse löschen
-          </button>
-        </Modal>
-      )}
-
-      {kidModal && (
-        <Modal title="Kind hinzufügen" onClose={() => setKidModal(false)}>
-          <div className="field">
-            <label>Symbol</label>
-            <EmojiButton value={kidSymbol} label="Symbol für neues Kind" onChange={setKidSymbol} />
-          </div>
-          <div className="field">
-            <label htmlFor="kid-name">Name</label>
-            <input
-              id="kid-name"
-              placeholder="z.B. Mina K."
-              value={kidName}
-              autoFocus
-              onChange={(e) => setKidName(e.target.value)}
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="kid-klass">Klasse</label>
-            <select id="kid-klass" value={kidKlass} onChange={(e) => setKidKlass(e.target.value)}>
-              <option value="">Klasse wählen…</option>
-              {state.klasses.map((c) => (
-                <option key={c.id} value={c.id}>Klasse {c.name}</option>
-              ))}
-            </select>
-          </div>
-          <button
-            disabled={!kidName.trim() || !kidKlass}
-            onClick={() => {
-              addKid(kidKlass, kidSymbol || '⭐', kidName.trim())
-              setKidName('')
-              setKidModal(false)
-            }}
-          >
-            anlegen
-          </button>
-        </Modal>
-      )}
+      {newKlass && <NewKlassDrawer onClose={() => setNewKlass(false)} />}
+      {editKlass && <KlassDrawer klassId={editKlass} onClose={() => setEditKlass(null)} />}
+      {newKid && <NewKidDrawer klassId={newKid} onClose={() => setNewKid(null)} />}
+      {editKid && <KidDrawer kidId={editKid} onClose={() => setEditKid(null)} />}
     </section>
   )
 }

@@ -233,6 +233,18 @@ Never commit real children's names. Seeds and fixtures use generated dummy names
 only (emoji symbol + first name + last-name initial, mirroring the original
 sheet's structure). The school enters real data in production only.
 
+## Verwaltung UI: tables read, drawers edit (one editing surface)
+
+Every Verwaltung table (rooms, kids, accounts) is a compact overview: plain
+text, no inline inputs, no row click targets. The pencil button (`.row-edit`,
+admin-gated where noted) opens the one editing surface, `Drawer` from
+`src/Drawer.tsx`: a right-side overlay with themed `DrawerTabs` when a form has
+more than a handful of fields (rooms: Allgemein/Klassen/Zeiten), immediate
+field commits, and the delete action in the `footer`. Create forms use the
+same drawer (`New*Drawer`). Modals remain only for non-editing surfaces:
+the password gates (PasswordGate, ImportWizard) and one-time notices (the
+generated account password). Editing via table row or popup is a bug.
+
 ## Form of address (German UI)
 
 The boards address the children informally („Wohin gehst du?"). Everything an

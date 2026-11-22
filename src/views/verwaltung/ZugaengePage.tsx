@@ -1,9 +1,10 @@
-import { Ban, CircleCheck, Hash, KeyRound, Lock, Plus } from 'lucide-react'
+import { Ban, CircleCheck, Hash, KeyRound, Lock, Pencil, Plus } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { Account, Role } from '../../types'
 import type { AuthResult } from '../../store'
 import { changePassword, changePin, createAccount, listAccounts, lockDevice, resetAccountPassword, updateAccount } from '../../store'
 import { Modal } from '../../components'
+import { Drawer } from '../../Drawer'
 import { useMeta } from '../../useBoard'
 
 /**
@@ -23,7 +24,7 @@ export function ZugaengePage({ password }: { password: string }) {
 }
 
 function CredentialsSection({ password }: { password: string }) {
-  const [modal, setModal] = useState<'password' | 'pin' | null>(null)
+  const [form, setForm] = useState<'password' | 'pin' | null>(null)
   const [next, setNext] = useState('')
   const [repeat, setRepeat] = useState('')
   const [pin, setPin] = useState('')
@@ -31,7 +32,7 @@ function CredentialsSection({ password }: { password: string }) {
   const [notice, setNotice] = useState<string | null>(null)
 
   const close = () => {
-    setModal(null)
+    setForm(null)
     setNext('')
     setRepeat('')
     setPin('')
@@ -58,16 +59,16 @@ function CredentialsSection({ password }: { password: string }) {
   return (
     <section>
       <h3>Zugangsdaten</h3>
-      <button onClick={() => { setNotice(null); setModal('password') }}>
+      <button onClick={() => { setNotice(null); setForm('password') }}>
         <KeyRound /> Passwort ändern
       </button>{' '}
-      <button onClick={() => { setNotice(null); setModal('pin') }}>
+      <button onClick={() => { setNotice(null); setForm('pin') }}>
         <Hash /> Lehrkraft-PIN ändern
       </button>
       {notice && <p className="count">{notice}</p>}
 
-      {modal === 'password' && (
-        <Modal title="Passwort ändern" onClose={close}>
+      {form === 'password' && (
+        <Drawer title="Passwort ändern" onClose={close}>
           <div className="field">
             <label htmlFor="cred-next">Neues Passwort</label>
             <input
@@ -83,14 +84,16 @@ function CredentialsSection({ password }: { password: string }) {
             />
           </div>
           {error && <p className="form-error">{error}</p>}
-          <button className="primary" disabled={!next || !repeat} onClick={() => void submitPassword()}>
-            speichern
-          </button>
-        </Modal>
+          <div className="field">
+            <button className="primary" disabled={!next || !repeat} onClick={() => void submitPassword()}>
+              speichern
+            </button>
+          </div>
+        </Drawer>
       )}
 
-      {modal === 'pin' && (
-        <Modal title="Lehrkraft-PIN ändern" onClose={close}>
+      {form === 'pin' && (
+        <Drawer title="Lehrkraft-PIN ändern" onClose={close}>
           <div className="field">
             <label htmlFor="cred-pin">Neue PIN</label>
             <input
@@ -99,12 +102,136 @@ function CredentialsSection({ password }: { password: string }) {
             />
           </div>
           {error && <p className="form-error">{error}</p>}
-          <button disabled={!pin} onClick={() => void submitPin()}>
-            speichern
-          </button>
-        </Modal>
+          <div className="field">
+            <button disabled={!pin} onClick={() => void submitPin()}>
+              speichern
+            </button>
+          </div>
+        </Drawer>
       )}
     </section>
+  )
+}
+
+/** The account in the drawer: role and status edit here, not in the table. */
+function AccountDrawer({
+  account,
+  protectedOwner,
+  onClose,
+  onPassword,
+}: {
+  account: Account
+  protectedOwner: boolean
+  onClose: () => void
+  onPassword: (email: string, password: string) => void
+}) {
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const me = useMeta().account?.email
+  const self = account.email === me
+
+  const run = (p: Promise<AuthResult>) => {
+    setError(null)
+    setBusy(true)
+    void p.then((r) => {
+      if (!r.ok) setError(r.reason)
+      setBusy(false)
+    })
+  }
+  const reset = async () => {
+    setError(null)
+    setBusy(true)
+    const r = await resetAccountPassword(account.id)
+    setBusy(false)
+    if (!r.ok) return setError(r.reason)
+    onPassword(account.email, r.password)
+  }
+
+  return (
+    <Drawer
+      title={account.email}
+      onClose={onClose}
+      footer={
+        <button disabled={busy} onClick={() => void reset()}>
+          <KeyRound /> Passwort zurücksetzen
+        </button>
+      }
+    >
+      <div className="field">
+        <label htmlFor={`acc-role-${account.id}`}>Rolle</label>
+        <select
+          id={`acc-role-${account.id}`}
+          value={account.role}
+          disabled={protectedOwner}
+          onChange={(e) => run(updateAccount(account.id, { role: e.target.value as Role }))}
+        >
+          <option value="owner">Inhaber</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+      <div className="field">
+        <label>Status</label>
+        <button
+          className="toggle"
+          disabled={(account.active && protectedOwner) || busy}
+          onClick={() => run(updateAccount(account.id, { active: !account.active }))}
+        >
+          {account.active ? (
+            <><Ban className="icon-amber" /> Deaktivieren</>
+          ) : (
+            <><CircleCheck className="icon-green" /> Aktivieren</>
+          )}
+        </button>
+      </div>
+      {self && <p className="hint">Das eigene Konto: Rolle und Status bleiben geschützt.</p>}
+      {error && <p className="form-error">{error}</p>}
+    </Drawer>
+  )
+}
+
+/** The same drawer in create mode; the generated password shows once after. */
+function NewAccountDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: (email: string, password: string) => void }) {
+  const [email, setEmail] = useState('')
+  const [role, setRole] = useState<Role>('admin')
+  const [error, setError] = useState<string | null>(null)
+
+  const submit = async () => {
+    setError(null)
+    const r = await createAccount(email.trim(), role)
+    if (!r.ok) return setError(r.reason)
+    setEmail('')
+    setRole('admin')
+    onClose()
+    onCreated(r.account.email, r.password)
+  }
+
+  return (
+    <Drawer title="Konto hinzufügen" onClose={onClose}>
+      <div className="field">
+        <label htmlFor="acc-email">E-Mail</label>
+        <input
+          id="acc-email"
+          type="email"
+          autoFocus
+          autoComplete="off"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+      </div>
+      <div className="field">
+        <label htmlFor="acc-role">Rolle</label>
+        <select id="acc-role" value={role} onChange={(e) => setRole(e.target.value as Role)}>
+          <option value="admin">Admin</option>
+          <option value="owner">Inhaber</option>
+        </select>
+      </div>
+      {error && <p className="form-error">{error}</p>}
+      <div className="field">
+        <button className="primary" disabled={!email.trim()} onClick={() => void submit()}>
+          anlegen
+        </button>
+      </div>
+    </Drawer>
   )
 }
 
@@ -121,8 +248,7 @@ function AccountsSection() {
   const [accounts, setAccounts] = useState<Account[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [addOpen, setAddOpen] = useState(false)
-  const [newEmail, setNewEmail] = useState('')
-  const [newRole, setNewRole] = useState<Role>('admin')
+  const [editOpen, setEditOpen] = useState<string | null>(null)
   // a generated password to show exactly once, for a new or reset account
   const [shown, setShown] = useState<{ email: string; password: string } | null>(null)
 
@@ -141,124 +267,75 @@ function AccountsSection() {
 
   const activeOwners = (accounts ?? []).filter((a) => a.role === 'owner' && a.active).length
 
-  const run = (p: Promise<AuthResult>) => {
-    setError(null)
-    void p.then((r) => {
-      if (!r.ok) setError(r.reason)
-      load()
-    })
-  }
-
-  const submitAdd = async () => {
-    setError(null)
-    const r = await createAccount(newEmail.trim(), newRole)
-    if (!r.ok) return setError(r.reason)
-    setAddOpen(false)
-    setNewEmail('')
-    setNewRole('admin')
-    setShown({ email: r.account.email, password: r.password })
-    load()
-  }
-
-  const resetPw = async (a: Account) => {
-    setError(null)
-    const r = await resetAccountPassword(a.id)
-    if (!r.ok) return setError(r.reason)
-    setShown({ email: a.email, password: r.password })
-  }
-
   return (
     <section>
       <h3>Konten</h3>
-      <table>
-        <thead>
-          <tr>
-            <th>E-Mail</th><th>Rolle</th><th>Status</th><th>Anmeldung</th>
-            <th className="th-add">
-              <button
-                className="add"
-                aria-label="Konto hinzufügen"
-                onClick={() => {
-                  setError(null)
-                  setAddOpen(true)
-                }}
-              >
-                <Plus />
-              </button>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {(accounts ?? []).map((a) => {
-            const self = a.email === me
-            // the two cases the server refuses, disabled here too
-            const protectedOwner = a.role === 'owner' && (self || activeOwners <= 1)
-            return (
+      <div className="table-wrap">
+        <table className="accounts-table">
+          <thead>
+            <tr>
+              <th>E-Mail</th><th>Rolle</th><th>Status</th>
+              <th className="th-add">
+                <button
+                  className="add"
+                  aria-label="Konto hinzufügen"
+                  onClick={() => {
+                    setError(null)
+                    setAddOpen(true)
+                  }}
+                >
+                  <Plus />
+                </button>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {(accounts ?? []).map((a) => (
               <tr key={a.id} className={a.active ? undefined : 'closed'}>
-                <td>{a.email}{self && ' (Sie)'}</td>
-                <td>
-                  <select
-                    value={a.role}
-                    disabled={protectedOwner}
-                    onChange={(e) => run(updateAccount(a.id, { role: e.target.value as Role }))}
-                  >
-                    <option value="owner">Inhaber</option>
-                    <option value="admin">Admin</option>
-                  </select>
+                <td className="cell-name">
+                  <div className="cell-name-inner">
+                    <span className="kid-name">{a.email}{a.email === me && ' (Sie)'}</span>
+                  </div>
                 </td>
+                <td>{a.role === 'owner' ? 'Inhaber' : 'Admin'}</td>
                 <td>{a.active ? 'aktiv' : 'deaktiviert'}</td>
-                <td>
+                <td className="td-edit">
                   <button
-                    className="toggle"
-                    disabled={a.active && protectedOwner}
-                    onClick={() => run(updateAccount(a.id, { active: !a.active }))}
+                    className="row-edit"
+                    aria-label={`Konto ${a.email} bearbeiten`}
+                    onClick={() => setEditOpen(a.id)}
                   >
-                    {a.active ? (
-                      <><Ban className="icon-amber" /> Deaktivieren</>
-                    ) : (
-                      <><CircleCheck className="icon-green" /> Aktivieren</>
-                    )}
-                  </button>
-                </td>
-                <td className="td-right">
-                  <button onClick={() => void resetPw(a)}>
-                    <KeyRound /> Passwort zurücksetzen
+                    <Pencil />
                   </button>
                 </td>
               </tr>
-            )
-          })}
-        </tbody>
-      </table>
+            ))}
+          </tbody>
+        </table>
+      </div>
       {error && <p className="form-error">{error}</p>}
 
       {addOpen && (
-        <Modal title="Konto hinzufügen" onClose={() => setAddOpen(false)}>
-          <div className="field">
-            <label htmlFor="acc-email">E-Mail</label>
-            <input
-              id="acc-email"
-              type="email"
-              autoFocus
-              autoComplete="off"
-              value={newEmail}
-              onChange={(e) => setNewEmail(e.target.value)}
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="acc-role">Rolle</label>
-            <select id="acc-role" value={newRole} onChange={(e) => setNewRole(e.target.value as Role)}>
-              <option value="admin">Admin</option>
-              <option value="owner">Inhaber</option>
-            </select>
-          </div>
-          {error && <p className="form-error">{error}</p>}
-          <button disabled={!newEmail.trim()} onClick={() => void submitAdd()}>
-            anlegen
-          </button>
-        </Modal>
+        <NewAccountDrawer
+          onClose={() => setAddOpen(false)}
+          onCreated={(email, password) => setShown({ email, password })}
+        />
       )}
-
+      {editOpen && (() => {
+        const account = (accounts ?? []).find((a) => a.id === editOpen)
+        if (!account) return null
+        const protectedOwner =
+          account.role === 'owner' && (account.email === me || activeOwners <= 1)
+        return (
+          <AccountDrawer
+            account={account}
+            protectedOwner={protectedOwner}
+            onClose={() => setEditOpen(null)}
+            onPassword={(email, password) => setShown({ email, password })}
+          />
+        )
+      })()}
+      {/* the one-time password is a notice, not an edit: it stays a modal */}
       {shown && (
         <Modal title="Passwort" onClose={() => setShown(null)}>
           <p>

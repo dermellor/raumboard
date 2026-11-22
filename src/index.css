@@ -821,11 +821,12 @@ h1 {
   color: var(--ink-soft);
 }
 
-/* --- add button in table header ------------------------------------------------ */
+/* --- add button and pencil: one flush-right slot ---------------------- */
 
 .admin th.th-add,
-.admin td.td-right {
+.admin td.td-edit {
   text-align: right;
+  vertical-align: middle;
 }
 
 /* open/close toggle: fixed width so the column doesn't jump */
@@ -1011,6 +1012,16 @@ h1 {
   font: inherit;
 }
 
+/* the native select arrow is tiny and sits oddly against the 2px border:
+   one drawn chevron in the icon stroke style instead */
+.admin select {
+  appearance: none;
+  padding-right: 2.4rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%237a7468' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.7rem center;
+}
+
 .admin section {
   margin-block: 2rem;
 }
@@ -1186,11 +1197,21 @@ h1 {
 
 /* first column: icon and name stay on one line; when the column runs out
    of room the name input gives way instead of wrapping under the icon */
+/* first column: icon and name stay on one line; the flex layout lives on
+   an inner wrapper, because `display: flex` on the td itself would take it
+   out of the table layout (its border-bottom then ends higher than the
+   row's, a visible step) */
 .admin td.cell-name {
+  vertical-align: middle;
+}
+
+.cell-name-inner {
   display: flex;
   align-items: center;
   gap: 0.4rem;
+  flex-wrap: wrap;
 }
+
 .admin td.cell-name .emoji-btn {
   flex: none;
 }
@@ -1258,21 +1279,9 @@ h1 {
   align-self: stretch;
 }
 
-/* the anchored dropdown under the „Für“ cell */
-.scope-menu {
-  position: fixed;
-  z-index: 30;
-  min-width: 11rem;
-  max-height: calc(100vh - 2rem);
-  overflow-y: auto;
-  padding: 0.4rem;
-  border-radius: 0.8rem;
-  border: 2px solid var(--line);
-  background: var(--card);
-  box-shadow: var(--shadow);
-}
-
-/* the same rows inline in the add-room form */
+/* the anchored dropdown under the „Für“ cell is gone with the table's inline
+   editing; what remains is the scope editor inside the drawers' forms */
+/* the scope rows inline in the room forms */
 .scope-inline {
   flex: 1;
   min-width: 0;
@@ -1284,17 +1293,265 @@ h1 {
   background: var(--card);
 }
 
-/* the „Für“ cell opens the dropdown; it just looks like every other control */
-.admin td .scope-edit {
-  white-space: nowrap;
-}
-
+/* the row-edit pencil replaced the dropdown toggle in the „Für“ cell */
 .admin .danger {
   border-color: #dc2626;
   color: #dc2626;
   font-weight: 600;
 }
 
+
+/* the rooms overview is the one table that must not shrink below its
+   column widths; on narrow viewports the wrapper scrolls horizontally
+   (same pattern as the operator admin's table wrap) */
+.rooms-table-wrap {
+  overflow-x: auto;
+}
+
+.rooms-table {
+  min-width: 52rem;
+}
+
+/* the add button above the list: the table's narrow layout has no header
+   row to carry the "+", so the same action appears here (hidden on desktop) */
+.add-narrow {
+  display: none;
+}
+
+/* the card labels („Belegt“) only exist in the narrow card layout */
+.cell-label {
+  display: none;
+}
+
+/* under 40rem the list stops being a table: each room becomes a card with
+   name, occupancy and the status toggle; every other column's editor lives
+   in the drawer, which the card opens anyway */
+@media (max-width: 40rem) {
+  .add-narrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin-block: 0 0.75rem;
+  }
+
+  .rooms-table-wrap {
+    overflow: visible;
+  }
+
+  .rooms-table,
+  .rooms-table tbody,
+  .rooms-table tr {
+    display: block;
+  }
+
+  .rooms-table thead {
+    display: none;
+  }
+
+  .rooms-table {
+    min-width: 0;
+  }
+
+  .rooms-table tr.room-row {
+    border: 2px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--card);
+    box-shadow: var(--shadow);
+    margin-bottom: 0.6rem;
+    padding: 0.7rem 0.8rem;
+  }
+
+  .rooms-table tr.room-row.closed {
+    background: #f3f1ea;
+  }
+
+  .rooms-table td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.2rem 0;
+    background: none;
+    border: none;
+  }
+
+  .rooms-table .col-kap,
+  .rooms-table .col-fuer,
+  .rooms-table .col-times,
+  .rooms-table .col-anzeige {
+    display: none;
+  }
+
+  .rooms-table .cell-name {
+    font-weight: 600;
+    font-size: 1.05rem;
+  }
+
+  .rooms-table .room-name {
+    overflow-wrap: anywhere;
+  }
+
+  .rooms-table .cell-label {
+    display: inline;
+    font-weight: 400;
+    color: var(--ink-soft);
+  }
+
+  .rooms-table button.toggle {
+    min-width: 0;
+  }
+}
+
+/* --- room drawer (one editing surface per room, over the table) --------- */
+
+.drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(50, 40, 25, 0.45);
+  z-index: 20;
+}
+
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(28rem, 100vw);
+  background: var(--bg);
+  border-left: 2px solid var(--line);
+  box-shadow: -8px 0 32px rgba(40, 30, 15, 0.25);
+  padding: 1.25rem 1.5rem;
+  overflow-y: auto;
+}
+
+.drawer h2 {
+  margin-top: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.drawer .close {
+  position: absolute;
+  top: 0.9rem;
+  right: 1rem;
+  min-width: 3rem;
+  min-height: 3rem;
+  border-radius: 999px;
+  border: 2px solid var(--line);
+  background: var(--card);
+  font-size: 1.2rem;
+  font-weight: 700;
+  padding: 0;
+}
+
+.drawer .field {
+  /* the admin forms lay label and input out as one flex row, but the drawer
+     is narrow and has multi-line sections (scope list, time windows), so its
+     fields stack: label above, full-width input below, one column everywhere */
+  display: block;
+}
+
+.drawer .field > label {
+  display: block;
+  margin: 0.25rem 0 0.35rem;
+}
+
+.drawer .field > input,
+.drawer .field > select {
+  width: 100%;
+  max-width: 100%;
+}
+
+/* inline width (the capacity's 5em) wins over the 100%, as intended */
+
+/* the time inputs keep their natural width and let the row wrap */
+.drawer input[type='time'] {
+  width: auto;
+  flex: none;
+}
+
+.drawer .window-row,
+.drawer .day-toggles {
+  max-width: 100%;
+}
+
+.drawer .field .hint {
+  margin: 0.35rem 0 0.75rem;
+}
+
+/* the tab strip groups the drawer's fields into short, thematic stays */
+.drawer-tabs {
+  display: flex;
+  gap: 0.3rem;
+  margin: 0.25rem 0 1rem;
+  border-bottom: 2px solid var(--line);
+}
+
+.drawer-tabs .tab {
+  border: none;
+  background: none;
+  border-radius: 0.6rem 0.6rem 0 0;
+  padding: 0.5rem 0.9rem;
+  min-height: auto;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+/* the active tab reads through a thicker line, in the ink accent
+   (--accent is a scoped variable in this design system, not global) */
+.drawer-tabs .tab.on {
+  color: var(--ink);
+  box-shadow: inset 0 -4px 0 var(--ink);
+}
+
+/* the delete button stays below the tabs, not part of any theme */
+.drawer-footer {
+  margin-top: 1.25rem;
+  padding-top: 0.9rem;
+  border-top: 2px solid var(--line);
+}
+
+/* the pencil that opens the drawer (admins only); the row itself is not a
+   click target anymore. Shared by the room, kid and account tables */
+.admin .row-edit {
+  min-width: 2.6rem;
+  min-height: 2.6rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 2px solid var(--line);
+  background: var(--card);
+}
+
+.admin .row-edit:hover {
+  border-color: var(--ink);
+}
+
+/* long names and e-mails must not push the table apart */
+.cell-name-inner .kid-name {
+  overflow-wrap: anywhere;
+}
+
+/* tables that can run wide (e-mails, roles) scroll instead of the page */
+.table-wrap {
+  overflow-x: auto;
+}
+
+/* the overview rows are no longer click targets */
+.room-row {
+  cursor: default;
+}
+
+.room-row:hover {
+  background: none;
+}
+
+.room-row:focus-visible {
+  outline: none;
+}
 
 /* --- time windows editor (AG Lernorte, room table's „Zeiten") ---------------- */
 
